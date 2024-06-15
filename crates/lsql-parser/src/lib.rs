@@ -4,9 +4,10 @@ pub enum LSQLCommand {
         
     },
     
-    Cd {
+    CD {
         to: String,
-    }
+    },
+    BACK,
 }
 
 #[derive(Debug)]
@@ -39,10 +40,14 @@ impl Parser {
                         "SELECT" => {
                             // Parse the SELECT command
                         }
+                        "BACK" => {
+                            let command = LSQLCommand::BACK;
+                            commands.push(command);
+                        }
                         "CD" => {
                             // the path will be the next token
                             let path = self.tokens[self.position + 1].literal.clone();
-                            let command = LSQLCommand::Cd {
+                            let command = LSQLCommand::CD {
                                 to: path,
                             };
                             commands.push(command);

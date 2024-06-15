@@ -29,7 +29,7 @@ pub struct Tokenizer<'a> {
     current_word_index: usize,
 }
 
-const KEYWORDS: [&str; 7] = ["SELECT", "FROM", "WHERE", "MOVE", "DELETE", "TO", "CD"];
+const KEYWORDS: [&str; 7] = ["SELECT", "FROM", "BACK", "MOVE", "DELETE", "TO", "CD"];
 const OPERATORS: &str = "=<>!";
 const PUNCTUATION: &str = "(),";
 

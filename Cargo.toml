@@ -14,3 +14,4 @@ members = [
 lsql-parser = { path = "./crates/lsql-parser" }
 walkdir = "2.5.0"
 chrono = "0.4.38"
+comfy-table = "7.1.1"

@@ -1,25 +1,27 @@
 use chrono::{self, DateTime, Utc};
+use comfy_table::Table;
 use lsql_parser::{self, LSQLCommand, Parser};
+use std::fs::File;
 #[allow(unused, unused_variables, dead_code)]
 // lsql - A simple SQL-like language interpreter to query the files
 // like ls but supercharged with SQL-like queries
 use std::{error::Error, fs, io::Write};
 use walkdir::WalkDir;
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum FileType {
     Directory,
     File,
     Other,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum FilePermission {
     Read,
     Write,
     Execute,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FileInfo {
     size: u64,
     modified: chrono::DateTime<Utc>,
@@ -27,6 +29,7 @@ struct FileInfo {
     file_type: FileType,
     path: String,
 }
+
 impl FileInfo {
     pub fn human_readable_size(&self) -> String {
         let size = self.size;
@@ -45,6 +48,42 @@ impl FileInfo {
         } else {
             format!("{:.2} TB", size as f64 / tb as f64)
         }
+    }
+
+    pub fn human_readable_modified(&self) -> String {
+        self.modified.format("%Y-%m-%d %H:%M:%S").to_string()
+    }
+}
+#[derive(Debug)]
+struct FileQuerySet {
+    result: Vec<FileInfo>,
+}
+
+impl FileQuerySet {
+    pub fn new(files: Vec<FileInfo>) -> Self {
+        FileQuerySet { result: files }
+    }
+
+    pub fn select(&mut self, files: Vec<FileInfo>) {
+        self.result = files;
+    }
+
+    pub fn table_them(&self) -> Table{
+        let mut table = Table::new();
+        table
+        .set_header(vec![
+            "Name",
+            "Size",
+            "Modified",
+        ]);
+        for file in &self.result {
+            table.add_row(vec![
+                file.name.clone(),
+                file.human_readable_size(),
+                file.human_readable_modified(),
+            ]);
+        };
+        return table;
     }
 }
 
@@ -76,18 +115,51 @@ fn list_dir_contents(path: &str) -> Result<Vec<FileInfo>, Box<dyn Error>> {
     }
     Ok(files)
 }
+
+
+struct State {
+    files: Vec<FileInfo>,
+    path: String,
+}
+
+impl State {
+pub fn new() -> Self{
+    State {
+        files: list_dir_contents(".").unwrap(),
+        path: String::from("."),
+    }
+}
+
+pub fn set_path(&mut self, path: &str) {
+    match fs::canonicalize(path) {
+        Ok(abs_path) => {
+            self.path = abs_path.to_str().unwrap().to_string();
+            self.files = list_dir_contents(&self.path).unwrap();
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+        }
+    }
+}
+pub fn get_abs_path(&self) -> String {
+    let abs_path = fs::canonicalize(&self.path).unwrap();
+    abs_path.display().to_string()
+}
+}
+
+
+
+
 fn main() {
     if cfg!(debug_assertions) {
         std::env::set_var("RUST_BACKTRACE", "1");
         std::env::set_var("RUST_LIB_BACKTRACE", "1");
     }
-
-    let args = std::env::args().skip(1);
-    let binding = fs::canonicalize(args.last().unwrap_or(String::from("."))).unwrap();
-    let abs_path = binding.to_str().unwrap();
-
+    let mut state = State::new();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    
     loop {
-        println!("lsql/path> {}", abs_path);
+        println!("lsql/path> {}", &state.path);
         print!("lsql> ");
         std::io::stdout().flush().unwrap();
         let mut input = String::new();
@@ -95,14 +167,17 @@ fn main() {
         let input = input.trim();
         let parsed = Parser::from_tokens_str(input).walk();
         let first = parsed.first();
+        let files_set = FileQuerySet::new(state.files.clone());
 
         match first {
-            None {} => {
+            None => {
                 println!("Invalid command");
             }
             Some(first) => match first {
-                LSQLCommand::Cd { to } => {
-                    println!("Changing directory to {}", to);
+                LSQLCommand::CD { to } => {
+                    state.set_path(&to);
+                    let table = files_set.table_them();
+                    println!("{}", table);
                 }
                 _ => {
                     println!("Invalid command");
