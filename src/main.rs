@@ -1,91 +1,12 @@
-use chrono::{self, DateTime, Utc};
-use comfy_table::Table;
-use lsql_parser::{self, LSQLCommand, Parser};
-use std::fs::File;
-#[allow(unused, unused_variables, dead_code)]
 // lsql - A simple SQL-like language interpreter to query the files
 // like ls but supercharged with SQL-like queries
-use std::{error::Error, fs, io::Write};
+pub mod files;
+pub mod antlr;
+
+use files::{FileInfo, FileQuerySet, FileType};
+use chrono::{self, DateTime, Utc};
 use walkdir::WalkDir;
-#[derive(Debug, Copy, Clone)]
-enum FileType {
-    Directory,
-    File,
-    Other,
-}
-
-#[derive(Debug, Copy, Clone)]
-enum FilePermission {
-    Read,
-    Write,
-    Execute,
-}
-
-#[derive(Debug, Clone)]
-struct FileInfo {
-    size: u64,
-    modified: chrono::DateTime<Utc>,
-    name: String,
-    file_type: FileType,
-    path: String,
-}
-
-impl FileInfo {
-    pub fn human_readable_size(&self) -> String {
-        let size = self.size;
-        let kb = 1024;
-        let mb = kb * 1024;
-        let gb = mb * 1024;
-        let tb = gb * 1024;
-        if size < kb {
-            format!("{} B", size)
-        } else if size < mb {
-            format!("{:.2} KB", size as f64 / kb as f64)
-        } else if size < gb {
-            format!("{:.2} MB", size as f64 / mb as f64)
-        } else if size < tb {
-            format!("{:.2} GB", size as f64 / gb as f64)
-        } else {
-            format!("{:.2} TB", size as f64 / tb as f64)
-        }
-    }
-
-    pub fn human_readable_modified(&self) -> String {
-        self.modified.format("%Y-%m-%d %H:%M:%S").to_string()
-    }
-}
-#[derive(Debug)]
-struct FileQuerySet {
-    result: Vec<FileInfo>,
-}
-
-impl FileQuerySet {
-    pub fn new(files: Vec<FileInfo>) -> Self {
-        FileQuerySet { result: files }
-    }
-
-    pub fn select(&mut self, files: Vec<FileInfo>) {
-        self.result = files;
-    }
-
-    pub fn table_them(&self) -> Table{
-        let mut table = Table::new();
-        table
-        .set_header(vec![
-            "Name",
-            "Size",
-            "Modified",
-        ]);
-        for file in &self.result {
-            table.add_row(vec![
-                file.name.clone(),
-                file.human_readable_size(),
-                file.human_readable_modified(),
-            ]);
-        };
-        return table;
-    }
-}
+use std::{error::Error, fs, io::Write};
 
 fn list_dir_contents(path: &str) -> Result<Vec<FileInfo>, Box<dyn Error>> {
     let mut files = Vec::new();
@@ -115,7 +36,6 @@ fn list_dir_contents(path: &str) -> Result<Vec<FileInfo>, Box<dyn Error>> {
     }
     Ok(files)
 }
-
 
 struct State {
     files: Vec<FileInfo>,
@@ -165,24 +85,6 @@ fn main() {
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
         let input = input.trim();
-        let parsed = Parser::from_tokens_str(input).walk();
-        let first = parsed.first();
         let files_set = FileQuerySet::new(state.files.clone());
-
-        match first {
-            None => {
-                println!("Invalid command");
-            }
-            Some(first) => match first {
-                LSQLCommand::CD { to } => {
-                    state.set_path(&to);
-                    let table = files_set.table_them();
-                    println!("{}", table);
-                }
-                _ => {
-                    println!("Invalid command");
-                }
-            },
-        }
     }
 }

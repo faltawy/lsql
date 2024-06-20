@@ -5,13 +5,8 @@ edition = "2021"
 exclude = [".github/**", "docs/**", "media/**", "scripts/**"]
 readme = "README.md"
 
-[workspace]
-members = [
-    "crates/*",
-]
-
 [dependencies]
-lsql-parser = { path = "./crates/lsql-parser" }
 walkdir = "2.5.0"
 chrono = "0.4.38"
 comfy-table = "7.1.1"
+antlr-rust = { version = "0.3.0-beta" }
