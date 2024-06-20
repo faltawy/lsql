@@ -167,20 +167,8 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "comfy-table",
- "lsql-parser",
  "walkdir",
 ]
-
-[[package]]
-name = "lsql-parser"
-version = "0.0.0"
-dependencies = [
- "lsql-tokenizer",
-]
-
-[[package]]
-name = "lsql-tokenizer"
-version = "0.0.0"
 
 [[package]]
 name = "num-traits"
