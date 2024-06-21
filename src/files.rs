@@ -49,6 +49,7 @@ impl FileInfo {
         self.modified.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }
+
 #[derive(Debug)]
 pub struct FileQuerySet {
     result: Vec<FileInfo>,
