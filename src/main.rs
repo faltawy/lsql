@@ -1,11 +1,14 @@
 // lsql - A simple SQL-like language interpreter to query the files
 // like ls but supercharged with SQL-like queries
 pub mod files;
+pub mod parser;
+
 #[allow(unused, unused_variables, dead_code)]
 use std::{error::Error, fs, io::Write};
 
 use chrono::{DateTime, Utc};
 use files::{FileInfo, FileType};
+use parser::parse;
 use walkdir::WalkDir;
 
 fn list_dir_contents(path: &str) -> Result<Vec<FileInfo>, Box<dyn Error>> {
@@ -81,5 +84,7 @@ fn main() {
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
         let input = input.trim();
+        let parsed = parse(input);
+        println!("{:?}", parsed);
     }
 }
