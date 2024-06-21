@@ -59,10 +59,6 @@ impl FileQuerySet {
         FileQuerySet { result: files }
     }
 
-    pub fn select(&mut self, files: Vec<FileInfo>) {
-        self.result = files;
-    }
-
     pub fn table_them(&self) -> Table{
         let mut table = Table::new();
         table

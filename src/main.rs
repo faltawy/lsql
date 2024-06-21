@@ -3,6 +3,7 @@
 pub mod files;
 pub mod parser;
 
+use std::result;
 #[allow(unused, unused_variables, dead_code)]
 use std::{error::Error, fs, io::Write};
 
@@ -86,5 +87,15 @@ fn main() {
         let input = input.trim();
         let parsed = parse(input);
         println!("{:?}", parsed);
+
+
+        match parsed {
+            Ok(result) => {
+                
+            },
+            Err(e) => {
+                eprintln!("Error: {}", e);
+            }
+        }
     }
 }
