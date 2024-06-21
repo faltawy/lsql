@@ -2,15 +2,12 @@
 // like ls but supercharged with SQL-like queries
 pub mod files;
 pub mod parser;
-
-use std::result;
-#[allow(unused, unused_variables, dead_code)]
 use std::{error::Error, fs, io::Write};
-
 use chrono::{DateTime, Utc};
 use files::{FileInfo, FileType};
 use parser::parse;
 use walkdir::WalkDir;
+use colored::Colorize;
 
 fn list_dir_contents(path: &str) -> Result<Vec<FileInfo>, Box<dyn Error>> {
     let mut files = Vec::new();
@@ -79,8 +76,8 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     loop {
-        println!("lsql/path> {}", &state.path);
-        print!("lsql> ");
+        let lsql_prompt = "lsql> ".green();
+        print!("{} ", lsql_prompt);
         std::io::stdout().flush().unwrap();
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
@@ -91,11 +88,27 @@ fn main() {
 
         match parsed {
             Ok(result) => {
-                
+                let (_remaining, commands) = result;
+                let first_command = commands.first().unwrap();
+                match first_command {
+                    parser::Command::Show => {
+                        let query_set = files::FileQuerySet::new(state.files.clone());
+                        let table = query_set.table_them();
+                        println!("{}", table);
+                    }
+                    
+                    parser::Command::ChangeDir { path } => {
+                        state.set_path(path);
+                    }
+                    _ => {
+                        println!("Command not implemented yet");
+                    }
+                }
             },
             Err(e) => {
                 eprintln!("Error: {}", e);
             }
-        }
+        };
+        
     }
 }
