@@ -10,6 +10,12 @@ on:
     branches:
       - master
 
+# Add permissions block at workflow level
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 env:
   CARGO_TERM_COLOR: always
   RUST_VERSION: stable
@@ -29,6 +35,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # This ensures the checkout action uses a token with sufficient permissions
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Semantic Release
         id: semantic
@@ -112,6 +120,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Download all artifacts
       uses: actions/download-artifact@v4
