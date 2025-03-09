@@ -1,0 +1,164 @@
+name: Build, Test and Release
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: stable
+
+jobs:
+  # This job determines the next version using conventional commits and semantic versioning
+  semantic-versioning:
+    name: Determine version
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    outputs:
+      new_version: ${{ steps.semantic.outputs.new_version }}
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      changelog: ${{ steps.semantic.outputs.changelog }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Semantic Release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          semantic_version: 19
+          branches: |
+            [
+              'master'
+            ]
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-test:
+    name: Build and Test (${{ matrix.target.rust }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-2019]
+        target:
+          - { rust: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+          - { rust: x86_64-pc-windows-msvc, os: windows-2019 }
+        exclude:
+          - os: ubuntu-latest
+            target: { rust: x86_64-pc-windows-msvc }
+          - os: windows-2019
+            target: { rust: x86_64-unknown-linux-gnu }
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ env.RUST_VERSION }}
+        targets: ${{ matrix.target.rust }}
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install cross (Linux only)
+      if: matrix.os == 'ubuntu-latest'
+      run: cargo install cross --locked
+
+    - name: Setup MSVC Environment (Windows only)
+      if: matrix.os == 'windows-2019'
+      uses: microsoft/setup-msbuild@v1.3
+
+    - name: Build (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: cross build --target ${{ matrix.target.rust }} --release
+
+    - name: Build (Windows)
+      if: matrix.os == 'windows-2019'
+      run: cargo build --target ${{ matrix.target.rust }} --release
+
+    - name: Run tests
+      run: cargo test --target ${{ matrix.target.rust }} --release
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts
+        cp target/${{ matrix.target.rust }}/release/lsql* artifacts/
+      shell: bash
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.target.rust }}-binaries
+        path: artifacts/
+        retention-days: 5
+
+  release:
+    needs: [build-and-test, semantic-versioning]
+    if: needs.semantic-versioning.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Zip artifacts by platform
+      run: |
+        mkdir -p releases
+        cd artifacts
+        find . -type d -name "*-binaries" | while read dir; do
+          platform=$(echo $dir | cut -d '-' -f 1-3)
+          zip -r "../releases/lsql-${{ needs.semantic-versioning.outputs.new_version }}-${platform}.zip" "$dir"
+        done
+      shell: bash
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ needs.semantic-versioning.outputs.new_version }}
+        name: Release v${{ needs.semantic-versioning.outputs.new_version }}
+        body: ${{ needs.semantic-versioning.outputs.changelog }}
+        files: |
+          releases/*.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-cargo-version:
+    needs: [semantic-versioning, release]
+    if: needs.semantic-versioning.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update version in Cargo.toml
+      run: |
+        sed -i "s/^version = \".*\"/version = \"${{ needs.semantic-versioning.outputs.new_version }}\"/" Cargo.toml
+      shell: bash
+
+    - name: Commit and push changes
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "chore(release): update version to ${{ needs.semantic-versioning.outputs.new_version }} [skip ci]"
+        file_pattern: Cargo.toml
