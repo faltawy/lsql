@@ -329,7 +329,7 @@ impl ThemeManager {
                 let path = entry.path();
 
                 // Only load .toml files
-                if path.is_file() && path.extension().map_or(false, |ext| ext == "toml") {
+                if path.is_file() && path.extension().is_some_and(|ext| ext == "toml") {
                     match fs::read_to_string(&path) {
                         Ok(contents) => match toml::from_str::<Theme>(&contents) {
                             Ok(theme) => {

@@ -132,7 +132,7 @@ fn get_entry_row(
 
     // Apply potential path italicization from theme
     let name_text = if theme.styles.italicize_paths {
-        format!("{}", entry.name)
+        entry.name.to_string()
     } else {
         entry.name.clone()
     };
@@ -174,14 +174,14 @@ fn get_entry_row(
                     "path" => {
                         // Apply italics to path if theme says so
                         let path_text = if theme.styles.italicize_paths && use_color {
-                            format!("{}", entry.path)
+                            entry.path.to_string()
                         } else {
                             entry.path.clone()
                         };
                         row.add_cell(Cell::new(&path_text));
                     }
                     "size" => {
-                        row.add_cell(Cell::new(&format_size(entry.size)));
+                        row.add_cell(Cell::new(format_size(entry.size)));
                     }
                     "modified" => {
                         let date_str = entry.modified.format("%Y-%m-%d %H:%M").to_string();
@@ -199,13 +199,13 @@ fn get_entry_row(
                         row.add_cell(Cell::new(&entry.permissions));
                     }
                     "is_hidden" => {
-                        row.add_cell(Cell::new(&entry.is_hidden.to_string()));
+                        row.add_cell(Cell::new(entry.is_hidden.to_string()));
                     }
                     "is_dir" => {
-                        row.add_cell(Cell::new(&entry.is_dir.to_string()));
+                        row.add_cell(Cell::new(entry.is_dir.to_string()));
                     }
                     "is_file" => {
-                        row.add_cell(Cell::new(&entry.is_file.to_string()));
+                        row.add_cell(Cell::new(entry.is_file.to_string()));
                     }
                     _ => {
                         row.add_cell(Cell::new("-"));

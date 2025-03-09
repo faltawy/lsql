@@ -326,7 +326,7 @@ impl LSQLParser {
             }
             Rule::number => {
                 let s = pair.as_str();
-                if let Some(unit_start) = s.find(|c: char| !c.is_digit(10) && c != '.') {
+                if let Some(unit_start) = s.find(|c: char| !c.is_ascii_digit() && c != '.') {
                     let (num_str, unit) = s.split_at(unit_start);
                     if let Ok(num) = num_str.parse::<f64>() {
                         let value = Value::SizedNumber(num, unit.to_string());
