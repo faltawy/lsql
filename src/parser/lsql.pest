@@ -35,7 +35,10 @@ primary_condition = {
 }
 comparison = { identifier ~ comparison_operator ~ value }
 identifier = { "name" | "path" | "size" | "modified" | "created" | "ext" | "permissions" | "owner" | "is_hidden" | "is_readonly" }
-comparison_operator = { "=" | "!=" | "<" | "<=" | ">" | ">=" | "like" | "contains" }
+// The ordering is important - check for multi-character operators first
+comparison_operator = { 
+    "<=" | ">=" | "=" | "!=" | "<" | ">" | "like" | "contains" 
+}
 value = @{ string | number | bool }
 string = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" }
 number = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ size_unit? }
