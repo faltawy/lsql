@@ -1,9 +1,9 @@
 // Theme Module
 // This module handles all theming and color customization for the application
 
-use colored::{Color as TermColor, ColoredString, Colorize};
+use colored::{ColoredString, Colorize};
 use comfy_table::Color;
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;

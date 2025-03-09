@@ -5,7 +5,6 @@ use comfy_table::{Cell, ContentArrangement, Row, Table};
 // Local is used indirectly through chrono's features
 #[allow(unused_imports)]
 use chrono::Local;
-use log::debug;
 
 use crate::fs::FSEntry;
 use crate::parser::SelectionType;
