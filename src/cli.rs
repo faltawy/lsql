@@ -10,6 +10,7 @@ use rustyline_derive::{Completer, Helper, Highlighter, Hinter, Validator};
 use crate::display;
 use crate::fs;
 use crate::parser::{LSQLParser, SelectionType};
+use crate::theme::{apply_color, Theme, ThemeManager};
 
 // Define the log level enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -46,6 +47,14 @@ pub struct Args {
     #[clap(long, short = 'l', value_enum, default_value = "info")]
     log_level: LogLevel,
 
+    /// Select the color theme
+    #[clap(long, short = 't', default_value = "default")]
+    theme: String,
+
+    /// List available themes
+    #[clap(long)]
+    list_themes: bool,
+
     /// Subcommands
     #[clap(subcommand)]
     command: Option<Command>,
@@ -56,6 +65,46 @@ pub struct Args {
 enum Command {
     /// Start interactive shell
     Shell,
+
+    /// Theme management
+    Theme {
+        /// Theme operation (list, create, export)
+        #[clap(subcommand)]
+        command: Option<ThemeCommand>,
+
+        /// Theme name to operate on
+        #[clap(long, short = 'n')]
+        name: Option<String>,
+    },
+}
+
+// Theme subcommands
+#[derive(Subcommand, Clone)]
+enum ThemeCommand {
+    /// List available themes
+    List,
+
+    /// Create a new theme
+    Create {
+        /// Based on an existing theme
+        #[clap(long)]
+        base: Option<String>,
+
+        /// Theme name
+        #[clap(long, short = 'n')]
+        name: String,
+
+        /// Theme description
+        #[clap(long, short = 'd')]
+        description: Option<String>,
+    },
+
+    /// Set the active theme
+    Set {
+        /// Theme name
+        #[clap(long, short = 'n', required = true)]
+        name: String,
+    },
 }
 
 // Input helper for rustyline
@@ -66,6 +115,7 @@ struct InputHelper;
 pub struct CLI {
     use_color: bool,
     recursive: bool,
+    theme_manager: ThemeManager,
 }
 
 impl CLI {
@@ -77,9 +127,22 @@ impl CLI {
         // Check if color should be enabled
         let use_color = !args.no_color;
 
+        // Initialize theme manager
+        let mut theme_manager = ThemeManager::new();
+        theme_manager.initialize();
+
+        // Set the selected theme
+        if !args.theme.is_empty() && args.theme != "default" {
+            if let Err(e) = theme_manager.set_theme(&args.theme) {
+                warn!("Could not set theme '{}': {}", args.theme, e);
+                eprintln!("Warning: Could not set theme '{}': {}", args.theme, e);
+            }
+        }
+
         CLI {
             use_color,
             recursive: args.recursive,
+            theme_manager,
         }
     }
 
@@ -109,8 +172,29 @@ impl CLI {
             self.recursive, self.use_color
         );
 
+        // Handle list_themes option
+        if args.list_themes {
+            return self.list_themes();
+        }
+
         match args.command {
             Some(Command::Shell) => self.run_interactive_shell(),
+            Some(Command::Theme { command, name }) => match command {
+                Some(ThemeCommand::List) => self.list_themes(),
+                Some(ThemeCommand::Create {
+                    base,
+                    name,
+                    description,
+                }) => self.create_theme(base, name, description),
+                Some(ThemeCommand::Set { name }) => self.set_theme(&name),
+                None => {
+                    if let Some(theme_name) = name {
+                        self.set_theme(&theme_name)
+                    } else {
+                        self.list_themes()
+                    }
+                }
+            },
             None => match args.query {
                 Some(query) => self.execute_query(&query),
                 None => {
@@ -119,6 +203,81 @@ impl CLI {
                     Ok(())
                 }
             },
+        }
+    }
+
+    // List available themes
+    fn list_themes(&self) -> Result<(), String> {
+        let themes = self.theme_manager.list_themes();
+        let current_theme = self.theme_manager.current_theme();
+
+        println!("Available themes:");
+        for theme_name in themes {
+            let is_current = theme_name == current_theme.name;
+            if is_current && self.use_color {
+                println!("  * {} (current)", theme_name.green());
+            } else if is_current {
+                println!("  * {} (current)", theme_name);
+            } else {
+                println!("    {}", theme_name);
+            }
+        }
+
+        println!("\nUse --theme NAME to select a theme");
+        Ok(())
+    }
+
+    // Set the current theme
+    fn set_theme(&self, theme_name: &str) -> Result<(), String> {
+        // Create a mutable clone for temporary modification
+        let mut theme_manager = self.theme_manager.clone();
+
+        match theme_manager.set_theme(theme_name) {
+            Ok(_) => {
+                println!("Theme set to: {}", theme_name);
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    // Create a new theme
+    fn create_theme(
+        &self,
+        base: Option<String>,
+        name: String,
+        description: Option<String>,
+    ) -> Result<(), String> {
+        if name.is_empty() {
+            return Err("Theme name cannot be empty".to_string());
+        }
+
+        // Start with a base theme (default or specified)
+        let mut theme_manager = self.theme_manager.clone();
+        let mut theme = match base {
+            Some(base_name) => {
+                // Try to set theme to the base to get a copy
+                match theme_manager.set_theme(&base_name) {
+                    Ok(_) => theme_manager.current_theme().clone(),
+                    Err(e) => return Err(format!("Base theme error: {}", e)),
+                }
+            }
+            None => Theme::default(),
+        };
+
+        // Update the theme with the new name and description
+        theme.name = name;
+        if let Some(desc) = description {
+            theme.description = desc;
+        }
+
+        // Save the new theme
+        match theme_manager.create_theme(theme) {
+            Ok(_) => {
+                println!("Theme created successfully");
+                Ok(())
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -139,8 +298,11 @@ impl CLI {
         println!();
 
         loop {
+            // Get the current theme
+            let theme = self.theme_manager.current_theme();
+
             let prompt = if self.use_color {
-                "lsql> ".green().to_string()
+                apply_color("lsql> ", &theme.colors.prompt, self.use_color).to_string()
             } else {
                 "lsql> ".to_string()
             };
@@ -160,11 +322,13 @@ impl CLI {
                         debug!("Executing query: {}", line);
                         if let Err(e) = self.execute_query(line) {
                             error!("Query execution failed: {}", e);
-                            if self.use_color {
-                                eprintln!("{}", format!("Error: {}", e).red());
-                            } else {
-                                eprintln!("Error: {}", e);
-                            }
+                            let error_msg = display::format_message(
+                                &format!("Error: {}", e),
+                                "error",
+                                theme,
+                                self.use_color,
+                            );
+                            eprintln!("{}", error_msg);
                         }
                     }
                 }
@@ -179,11 +343,13 @@ impl CLI {
                 }
                 Err(e) => {
                     error!("Readline error: {}", e);
-                    if self.use_color {
-                        eprintln!("{}", format!("Error: {}", e).red());
-                    } else {
-                        eprintln!("Error: {}", e);
-                    }
+                    let error_msg = display::format_message(
+                        &format!("Error: {}", e),
+                        "error",
+                        theme,
+                        self.use_color,
+                    );
+                    eprintln!("{}", error_msg);
                     break;
                 }
             }
@@ -197,6 +363,9 @@ impl CLI {
     // Execute a single query
     fn execute_query(&self, query_str: &str) -> Result<(), String> {
         debug!("Parsing query: {}", query_str);
+
+        // Get the current theme
+        let theme = self.theme_manager.current_theme();
 
         // Parse the query
         let query = match LSQLParser::parse_query(query_str) {
@@ -241,14 +410,16 @@ impl CLI {
         // Display results
         if filtered_entries.is_empty() {
             info!("No results found for query");
-            if self.use_color {
-                println!("{}", "No results found.".yellow());
-            } else {
-                println!("No results found.");
-            }
+            let message =
+                display::format_message("No results found.", "warning", theme, self.use_color);
+            println!("{}", message);
         } else {
-            let table =
-                display::display_entries(&filtered_entries, &query.selection, self.use_color);
+            let table = display::display_entries(
+                &filtered_entries,
+                &query.selection,
+                theme,
+                self.use_color,
+            );
             println!("{}", table);
 
             let count_message = format!(
@@ -263,28 +434,8 @@ impl CLI {
 
             info!("{}", count_message);
 
-            if self.use_color {
-                println!(
-                    "{} {} {}",
-                    filtered_entries.len().to_string().green(),
-                    "items found.".green(),
-                    if self.recursive {
-                        "(recursive search)".dimmed()
-                    } else {
-                        "".normal()
-                    }
-                );
-            } else {
-                println!(
-                    "{} items found.{}",
-                    filtered_entries.len(),
-                    if self.recursive {
-                        " (recursive search)"
-                    } else {
-                        ""
-                    }
-                );
-            }
+            let message = display::format_message(&count_message, "success", theme, self.use_color);
+            println!("{}", message);
         }
 
         Ok(())

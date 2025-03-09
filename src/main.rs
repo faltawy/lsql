@@ -5,6 +5,7 @@ mod cli;
 mod display;
 mod fs;
 mod parser;
+mod theme;
 
 use clap::Parser;
 use cli::{Args, CLI};

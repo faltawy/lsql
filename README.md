@@ -155,3 +155,44 @@ We welcome all contributions, from bug fixes to new features!
 ## License
 
 MIT
+
+## Theming
+
+LSQL supports customizable themes to personalize the appearance of the output. The application comes with several built-in themes:
+
+- `default`: Standard theme with a clean, modern look
+- `dark`: Optimized for dark terminal backgrounds with bright colors
+- `light`: Optimized for light terminal backgrounds
+- `vibrant`: High-contrast theme with bright colors
+- `minimal`: Simplified theme with minimal styling
+
+### Using Themes
+
+Select a theme using the `--theme` (or `-t`) option:
+
+```bash
+lsql --theme dark "select * from .;"
+```
+
+List all available themes:
+
+```bash
+lsql --list-themes
+```
+
+### Theme Management
+
+LSQL provides commands to manage themes:
+
+```bash
+# List all available themes
+lsql theme list
+
+# Set a theme
+lsql theme set --name dark
+
+# Create a new theme
+lsql theme create --name mytheme --base dark --description "My custom theme"
+```
+
+For detailed information about creating and customizing themes, see the [Theme Guide](docs/themes.md).
