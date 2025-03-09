@@ -40,6 +40,18 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: cargo install cross --locked
 
+    # Install Visual Studio Build Tools for Windows
+    - name: Install VS Build Tools (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        curl -o vs_buildtools.exe https://aka.ms/vs/17/release/vs_buildtools.exe
+        vs_buildtools.exe --quiet --wait --norestart --nocache `
+          --add Microsoft.VisualStudio.Workload.VCTools `
+          --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+          --add Microsoft.VisualStudio.Component.Windows10SDK
+        del vs_buildtools.exe
+      shell: cmd
+
     # Setup MSVC environment for Windows
     - name: Setup MSVC Environment
       if: matrix.os == 'windows-latest'
