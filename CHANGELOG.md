@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.3.0](https://github.com/faltawy/lsql/compare/v1.2.0...v1.3.0) (2025-03-10)
+
+### Features
+
+* **shell:** Implement interactive shell with enhanced user experience ([79d372e](https://github.com/faltawy/lsql/commit/79d372e015077205405ba564ff3541c1191d5829))
+
 ## [1.2.0](https://github.com/faltawy/lsql/compare/v1.1.0...v1.2.0) (2025-03-10)
 
 ### Features
