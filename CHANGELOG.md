@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.4.1](https://github.com/faltawy/lsql/compare/v1.4.0...v1.4.1) (2025-03-10)
+
+### Bug Fixes
+
+* update GitHub release workflow to fix artifact upload issues ([989268f](https://github.com/faltawy/lsql/commit/989268f9751e7e0b068726f558f49235b739118c))
+
 ## [1.4.0](https://github.com/faltawy/lsql/compare/v1.3.0...v1.4.0) (2025-03-10)
 
 ### Features
