@@ -1,5 +1,18 @@
 # LSQL Changelog
 
+## [1.4.0](https://github.com/faltawy/lsql/compare/v1.3.0...v1.4.0) (2025-03-10)
+
+### Features
+
+* **filter:** Add comprehensive file system filtering module ([85aa263](https://github.com/faltawy/lsql/commit/85aa26395a647c68bfcb4f653f78a02fa246f3da))
+* **vscode:** Add debug configuration for LSQL project ([f50a53a](https://github.com/faltawy/lsql/commit/f50a53abc1875ef163851c18e120480225d5b9ff))
+
+### Code Refactoring
+
+* **parser:** Modularize query parsing with separate concern modules ([252fde4](https://github.com/faltawy/lsql/commit/252fde41580974e453a6eea6848afb486ea96769))
+* **parser:** Remove unused imports and simplify type references ([5e29d03](https://github.com/faltawy/lsql/commit/5e29d034e009cfecbed8aaf6117dc7a4aeae5d5c))
+* **shell:** Improve error handling and shell interaction ([208bdbd](https://github.com/faltawy/lsql/commit/208bdbd327565c585208278177d33eea5819b8c0))
+
 ## [1.3.0](https://github.com/faltawy/lsql/compare/v1.2.0...v1.3.0) (2025-03-10)
 
 ### Features
