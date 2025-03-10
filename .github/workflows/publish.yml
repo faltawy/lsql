@@ -197,7 +197,18 @@ jobs:
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
 
+    - name: Check for uncommitted changes
+      run: git status
+
+    - name: Add Cargo.lock to .gitignore if needed
+      run: |
+        if ! grep -q "Cargo.lock" .gitignore; then
+          echo "Cargo.lock" >> .gitignore
+          git add .gitignore
+          git commit -m "chore: add Cargo.lock to .gitignore [skip ci]"
+        fi
+
     - name: Publish to crates.io
-      run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+      run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --allow-dirty
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
