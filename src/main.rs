@@ -5,6 +5,7 @@ mod cli;
 mod display;
 mod fs;
 mod parser;
+mod shell;
 mod theme;
 
 use clap::Parser;
@@ -20,10 +21,20 @@ fn main() {
 
     info!("LSQL started");
 
-    if let Err(e) = cli.run(args) {
-        error!("Error: {}", e);
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
+    // Check if interactive mode is enabled, or Shell subcommand is used
+    let is_interactive = args.interactive || matches!(args.command, Some(cli::Command::Shell));
+
+    if is_interactive {
+        // Run in interactive shell mode
+        let mut shell = shell::LSQLShell::new();
+        shell.run(&cli);
+    } else {
+        // Run in normal mode with command line arguments
+        if let Err(e) = cli.run(args) {
+            error!("Error: {}", e);
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
     }
 
     info!("LSQL completed successfully");

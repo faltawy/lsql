@@ -234,3 +234,21 @@ pub fn format_message(message: &str, color_name: &str, theme: &Theme, use_color:
 
     apply_color(message, color, use_color).to_string()
 }
+
+// Display the results of a query
+pub fn display_results(
+    results: &[FSEntry],
+    selection: &SelectionType,
+    theme: &Theme,
+    use_color: bool,
+) -> Result<(), String> {
+    if results.is_empty() {
+        let message = format_message("No results found.", "warning", theme, use_color);
+        println!("{}", message);
+    } else {
+        let table = display_entries(results, selection, theme, use_color);
+        println!("{}", table);
+    }
+
+    Ok(())
+}

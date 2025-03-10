@@ -3,14 +3,12 @@
 
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
-use log::{debug, error, info, warn};
-use rustyline::{error::ReadlineError, DefaultEditor};
-use rustyline_derive::{Completer, Helper, Highlighter, Hinter, Validator};
+use log::{debug, info, warn};
 
 use crate::display;
 use crate::fs;
-use crate::parser::{LSQLParser, SelectionType};
-use crate::theme::{apply_color, Theme, ThemeManager};
+use crate::parser::LSQLParser;
+use crate::theme::{Theme, ThemeManager};
 
 // Define the log level enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -33,36 +31,40 @@ pub enum LogLevel {
 pub struct Args {
     /// SQL-like query to execute
     #[clap(index = 1)]
-    query: Option<String>,
+    pub query: Option<String>,
 
     /// Disable colored output
     #[clap(long, short = 'n')]
-    no_color: bool,
+    pub no_color: bool,
 
     /// Enable recursive search (default is non-recursive)
     #[clap(long, short = 'r')]
-    recursive: bool,
+    pub recursive: bool,
 
     /// Set the logging level
     #[clap(long, short = 'l', value_enum, default_value = "off")]
-    log_level: LogLevel,
+    pub log_level: LogLevel,
 
     /// Select the color theme
     #[clap(long, short = 't', default_value = "default")]
-    theme: String,
+    pub theme: String,
 
     /// List available themes
     #[clap(long)]
-    list_themes: bool,
+    pub list_themes: bool,
+
+    /// Start interactive mode
+    #[clap(long, short = 'i')]
+    pub interactive: bool,
 
     /// Subcommands
     #[clap(subcommand)]
-    command: Option<Command>,
+    pub command: Option<Command>,
 }
 
 // Define subcommands
-#[derive(Subcommand, Clone)]
-enum Command {
+#[derive(Subcommand, Clone, Debug)]
+pub enum Command {
     /// Start interactive shell
     Shell,
 
@@ -79,8 +81,8 @@ enum Command {
 }
 
 // Theme subcommands
-#[derive(Subcommand, Clone)]
-enum ThemeCommand {
+#[derive(Subcommand, Clone, Debug)]
+pub enum ThemeCommand {
     /// List available themes
     List,
 
@@ -106,10 +108,6 @@ enum ThemeCommand {
         name: String,
     },
 }
-
-// Input helper for rustyline
-#[derive(Helper, Completer, Hinter, Validator, Highlighter)]
-struct InputHelper;
 
 // Main CLI handler
 pub struct CLI {
@@ -168,42 +166,70 @@ impl CLI {
     // Run the CLI
     pub fn run(self, args: Args) -> Result<(), String> {
         debug!(
-            "Running with args: recursive={}, color={}",
-            self.recursive, self.use_color
+            "Running with recursive: {}, color: {}",
+            args.recursive, !args.no_color
         );
 
-        // Handle list_themes option
         if args.list_themes {
             return self.list_themes();
         }
 
-        match args.command {
-            Some(Command::Shell) => self.run_interactive_shell(),
-            Some(Command::Theme { command, name }) => match command {
-                Some(ThemeCommand::List) => self.list_themes(),
-                Some(ThemeCommand::Create {
-                    base,
-                    name,
-                    description,
-                }) => self.create_theme(base, name, description),
-                Some(ThemeCommand::Set { name }) => self.set_theme(&name),
-                None => {
-                    if let Some(theme_name) = name {
-                        self.set_theme(&theme_name)
-                    } else {
-                        self.list_themes()
+        // Handle subcommands
+        if let Some(command) = args.command {
+            match command {
+                Command::Shell => {
+                    // Handled in main.rs now
+                    return Ok(());
+                }
+                Command::Theme { command, name } => {
+                    debug!("Theme command: {:?}, name: {:?}", command, name);
+
+                    // Handle theme command
+                    match command {
+                        Some(ThemeCommand::List) => {
+                            return self.list_themes();
+                        }
+                        Some(ThemeCommand::Create {
+                            base,
+                            name,
+                            description,
+                        }) => {
+                            debug!(
+                                "Creating theme '{}' based on '{:?}' with description '{:?}'",
+                                name, base, description
+                            );
+                            return self.create_theme(base, name, description);
+                        }
+                        Some(ThemeCommand::Set { name }) => {
+                            debug!("Setting theme '{}'", name);
+                            return self.set_theme(&name);
+                        }
+                        None => {
+                            // If no subcommand is provided but a name is provided, assume "set"
+                            if let Some(name) = name {
+                                debug!("Setting theme '{}'", name);
+                                return self.set_theme(&name);
+                            }
+                        }
                     }
+                    return Ok(());
                 }
-            },
-            None => match args.query {
-                Some(query) => self.execute_query(&query),
-                None => {
-                    info!("No query provided. Use --help for usage information or 'lsql shell' for interactive mode.");
-                    println!("No query provided. Use --help for usage information or 'lsql shell' for interactive mode.");
-                    Ok(())
-                }
-            },
+            }
         }
+
+        // If interactive flag is set, we'll handle it in main.rs
+        if args.interactive {
+            return Ok(());
+        }
+
+        // Execute query if provided
+        if let Some(query) = args.query {
+            return self.execute_query(&query);
+        }
+
+        // Neither query nor subcommand provided
+        eprintln!("No query or subcommand provided. Use --help for usage information.");
+        Ok(())
     }
 
     // List available themes
@@ -281,159 +307,32 @@ impl CLI {
         }
     }
 
-    // Run interactive shell
-    fn run_interactive_shell(&self) -> Result<(), String> {
-        debug!("Starting interactive shell");
-
-        let mut rl = DefaultEditor::new().map_err(|e| format!("Failed to start editor: {}", e))?;
-        let _ = rl.load_history(".lsql_history"); // Ignore error if no history file
-
-        // Print welcome message
-        println!("Welcome to LSQL Shell. Type SQL-like queries to explore your filesystem.");
-        println!("Examples:");
-        println!("  select * from .;");
-        println!("  select files from ./Downloads where ext=\"pdf\";");
-        println!("  select * from . where size > \"10mb\";");
-        println!("Type 'exit' or press Ctrl+D to exit.");
-        println!();
-
-        loop {
-            // Get the current theme
-            let theme = self.theme_manager.current_theme();
-
-            let prompt = if self.use_color {
-                apply_color("lsql> ", &theme.colors.prompt, self.use_color).to_string()
-            } else {
-                "lsql> ".to_string()
-            };
-
-            match rl.readline(&prompt) {
-                Ok(line) => {
-                    rl.add_history_entry(&line)
-                        .map_err(|e| format!("History error: {}", e))?;
-
-                    let line = line.trim();
-                    if line.eq_ignore_ascii_case("exit") || line.eq_ignore_ascii_case("quit") {
-                        debug!("User requested exit from shell");
-                        break;
-                    }
-
-                    if !line.is_empty() {
-                        debug!("Executing query: {}", line);
-                        if let Err(e) = self.execute_query(line) {
-                            error!("Query execution failed: {}", e);
-                            let error_msg = display::format_message(
-                                &format!("Error: {}", e),
-                                "error",
-                                theme,
-                                self.use_color,
-                            );
-                            eprintln!("{}", error_msg);
-                        }
-                    }
-                }
-                Err(ReadlineError::Interrupted) => {
-                    // Ctrl+C, ignore
-                    debug!("Readline interrupted (Ctrl+C)");
-                }
-                Err(ReadlineError::Eof) => {
-                    // Ctrl+D
-                    debug!("Readline EOF (Ctrl+D)");
-                    break;
-                }
-                Err(e) => {
-                    error!("Readline error: {}", e);
-                    let error_msg = display::format_message(
-                        &format!("Error: {}", e),
-                        "error",
-                        theme,
-                        self.use_color,
-                    );
-                    eprintln!("{}", error_msg);
-                    break;
-                }
-            }
-        }
-
-        info!("Shell session ended");
-        let _ = rl.save_history(".lsql_history"); // Ignore error on save
-        Ok(())
-    }
-
     // Execute a single query
-    fn execute_query(&self, query_str: &str) -> Result<(), String> {
-        debug!("Parsing query: {}", query_str);
+    pub fn execute_query(&self, query_str: &str) -> Result<(), String> {
+        debug!("Executing query: {}", query_str);
+
+        // Parse query
+        let query = LSQLParser::parse_query(query_str)?;
+        debug!("Parsed query: {:?}", query);
+
+        // Build search context
+        let path = query.path.clone();
+        let search_context = fs::SearchContext::new(self.recursive);
+
+        // Execute query to get the results
+        let results = fs::execute_query(&query, &path, &search_context)?;
+        debug!("Found {} items matching query", results.len());
 
         // Get the current theme
         let theme = self.theme_manager.current_theme();
 
-        // Parse the query
-        let query = match LSQLParser::parse_query(query_str) {
-            Ok(q) => q,
-            Err(e) => {
-                error!("Query parsing failed: {}", e);
-                return Err(e);
-            }
-        };
-
-        debug!("Query parsed successfully: {:?}", query);
-
-        // Get filesystem entries
-        let entries = match fs::list_entries(
-            &query.path,
-            &query.selection,
-            &query.condition,
-            self.recursive,
-        ) {
-            Ok(entries) => entries,
-            Err(e) => {
-                error!("Failed to list entries: {}", e);
-                return Err(e);
-            }
-        };
-
-        debug!("Found {} entries before filtering", entries.len());
-
-        // Filter entries based on selection type
-        let filtered_entries = entries
-            .into_iter()
-            .filter(|entry| match query.selection {
-                SelectionType::All => true,
-                SelectionType::Files => entry.is_file,
-                SelectionType::Directories => entry.is_dir,
-                SelectionType::Fields(_) => true,
-            })
-            .collect::<Vec<_>>();
-
-        debug!("Filtered to {} entries", filtered_entries.len());
-
         // Display results
-        if filtered_entries.is_empty() {
-            info!("No results found for query");
-            let message =
-                display::format_message("No results found.", "warning", theme, self.use_color);
-            println!("{}", message);
-        } else {
-            let table = display::display_entries(
-                &filtered_entries,
-                &query.selection,
-                theme,
-                self.use_color,
-            );
-            println!("{}", table);
+        display::display_results(&results, &query.selection, theme, self.use_color)?;
 
-            let count_message = format!(
-                "{} items found{}",
-                filtered_entries.len(),
-                if self.recursive {
-                    " (recursive search)"
-                } else {
-                    ""
-                }
-            );
-
-            info!("{}", count_message);
-
+        // Print count
+        if !results.is_empty() {
+            info!("{} items found", results.len());
+            let count_message = format!("{} items found", results.len());
             let message = display::format_message(&count_message, "success", theme, self.use_color);
             println!("{}", message);
         }

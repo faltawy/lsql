@@ -400,3 +400,48 @@ fn normalize_path(path_str: &str) -> Result<PathBuf, String> {
 
     Ok(path)
 }
+
+// A search context with configuration for how to search
+pub struct SearchContext {
+    pub recursive: bool,
+}
+
+impl SearchContext {
+    pub fn new(recursive: bool) -> Self {
+        Self { recursive }
+    }
+}
+
+// Execute a query to get filtered filesystem entries
+pub fn execute_query(
+    query: &crate::parser::Query,
+    path: &str,
+    context: &SearchContext,
+) -> Result<Vec<FSEntry>, String> {
+    debug!("Executing query on path: {}", path);
+
+    // Get filesystem entries
+    let entries = list_entries(
+        &query.path,
+        &query.selection,
+        &query.condition,
+        context.recursive,
+    )?;
+
+    debug!("Found {} entries before filtering", entries.len());
+
+    // Filter entries based on selection type
+    let filtered_entries = entries
+        .into_iter()
+        .filter(|entry| match query.selection {
+            crate::parser::SelectionType::All => true,
+            crate::parser::SelectionType::Files => entry.is_file,
+            crate::parser::SelectionType::Directories => entry.is_dir,
+            crate::parser::SelectionType::Fields(_) => true,
+        })
+        .collect::<Vec<_>>();
+
+    debug!("Filtered to {} entries", filtered_entries.len());
+
+    Ok(filtered_entries)
+}
