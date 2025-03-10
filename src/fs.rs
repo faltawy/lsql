@@ -250,13 +250,86 @@ pub fn execute_query(
         &query.path
     };
 
-    list_entries(
+    // Get the entries
+    let mut entries = list_entries(
         path_to_search,
         &query.selection,
         &query.condition,
         query.limit,
         context.recursive,
-    )
+    )?;
+
+    // Apply sorting if ORDER BY is specified
+    if !query.order_by.is_empty() {
+        sort_entries(&mut entries, &query.order_by);
+    }
+
+    Ok(entries)
+}
+
+// Sort entries based on ORDER BY terms
+fn sort_entries(entries: &mut Vec<FSEntry>, order_by: &[crate::parser::OrderTerm]) {
+    use crate::parser::OrderDirection;
+    use std::cmp::Ordering;
+
+    entries.sort_by(|a, b| {
+        // Apply each ORDER BY term in sequence
+        for term in order_by {
+            let ordering = match term.field.as_str() {
+                "name" => compare_strings(&a.name, &b.name),
+                "path" => compare_strings(&a.path, &b.path),
+                "size" => compare_numbers(a.size, b.size),
+                "modified" => compare_dates(&a.modified, &b.modified),
+                "created" => compare_dates(&a.created, &b.created),
+                "ext" => compare_options(&a.extension, &b.extension),
+                "permissions" => compare_strings(&a.permissions, &b.permissions),
+                "is_hidden" => compare_bools(a.is_hidden, b.is_hidden),
+                "is_readonly" => compare_strings(&a.permissions, &b.permissions),
+                _ => Ordering::Equal, // Unknown field, no sorting
+            };
+
+            // If this term gives a non-equal result, return it (possibly reversed for DESC)
+            if ordering != Ordering::Equal {
+                return if term.direction == OrderDirection::Ascending {
+                    ordering
+                } else {
+                    ordering.reverse()
+                };
+            }
+        }
+
+        // If all terms are equal, maintain original order
+        Ordering::Equal
+    });
+}
+
+// Helper functions for comparing different types
+fn compare_strings(a: &str, b: &str) -> std::cmp::Ordering {
+    a.cmp(b)
+}
+
+fn compare_numbers(a: u64, b: u64) -> std::cmp::Ordering {
+    a.cmp(&b)
+}
+
+fn compare_dates(
+    a: &chrono::DateTime<chrono::Local>,
+    b: &chrono::DateTime<chrono::Local>,
+) -> std::cmp::Ordering {
+    a.cmp(b)
+}
+
+fn compare_options<T: Ord>(a: &Option<T>, b: &Option<T>) -> std::cmp::Ordering {
+    match (a, b) {
+        (Some(a_val), Some(b_val)) => a_val.cmp(b_val),
+        (Some(_), None) => std::cmp::Ordering::Greater,
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (None, None) => std::cmp::Ordering::Equal,
+    }
+}
+
+fn compare_bools(a: bool, b: bool) -> std::cmp::Ordering {
+    a.cmp(&b)
 }
 
 // Delete entries that match the criteria
@@ -372,7 +445,9 @@ pub fn execute_delete_query(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::{ComparisonOperator, Condition, ConditionNode, SelectionType, Value};
+    use crate::parser::{
+        ComparisonOperator, Condition, ConditionNode, OrderDirection, SelectionType, Value,
+    };
     use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
@@ -761,5 +836,103 @@ mod tests {
         // Verify the level1 directory no longer exists
         let has_level1 = after_entries.iter().any(|e| e.name == "level1");
         assert!(!has_level1, "level1 directory should be deleted");
+    }
+
+    #[test]
+    fn test_sort_entries() {
+        // Create a test directory with files of different sizes and names
+        let temp_dir = setup_test_directory();
+        let dir_path = temp_dir.path().to_string_lossy().to_string();
+
+        // Get all entries
+        let mut entries =
+            list_entries(&dir_path, &SelectionType::Files, &None, None, false).unwrap();
+
+        // Ensure we have at least 3 entries for testing
+        assert!(
+            entries.len() >= 3,
+            "Need at least 3 entries for sorting test"
+        );
+
+        // Sort by name ascending
+        let order_by_name_asc = vec![crate::parser::OrderTerm {
+            field: "name".to_string(),
+            direction: OrderDirection::Ascending,
+        }];
+
+        sort_entries(&mut entries, &order_by_name_asc);
+
+        // Verify entries are sorted by name ascending
+        for i in 1..entries.len() {
+            assert!(
+                entries[i - 1].name <= entries[i].name,
+                "Entries should be sorted by name ascending"
+            );
+        }
+
+        // Sort by name descending
+        let order_by_name_desc = vec![crate::parser::OrderTerm {
+            field: "name".to_string(),
+            direction: OrderDirection::Descending,
+        }];
+
+        sort_entries(&mut entries, &order_by_name_desc);
+
+        // Verify entries are sorted by name descending
+        for i in 1..entries.len() {
+            assert!(
+                entries[i - 1].name >= entries[i].name,
+                "Entries should be sorted by name descending"
+            );
+        }
+
+        // Test multi-field sorting
+        // First, make sure we have files with different sizes
+        let mut entries = list_entries(
+            &dir_path,
+            &SelectionType::Files,
+            &None,
+            None,
+            true, // recursive to get more files
+        )
+        .unwrap();
+
+        // Sort by is_dir (to group directories and files) then by name
+        let order_by_multiple = vec![
+            crate::parser::OrderTerm {
+                field: "is_dir".to_string(),
+                direction: OrderDirection::Descending, // Directories first
+            },
+            crate::parser::OrderTerm {
+                field: "name".to_string(),
+                direction: OrderDirection::Ascending,
+            },
+        ];
+
+        sort_entries(&mut entries, &order_by_multiple);
+
+        // Verify directories come first, then files, and each group is sorted by name
+        let mut last_is_dir = true;
+        let mut last_name = String::new();
+
+        for entry in &entries {
+            // Once we switch from directories to files, reset the name comparison
+            if last_is_dir && !entry.is_dir {
+                last_is_dir = false;
+                last_name = String::new();
+            }
+
+            // Within the same group (dirs or files), names should be ascending
+            if !last_name.is_empty() {
+                if last_is_dir == entry.is_dir {
+                    assert!(
+                        last_name <= entry.name,
+                        "Within same group, entries should be sorted by name ascending"
+                    );
+                }
+            }
+
+            last_name = entry.name.clone();
+        }
     }
 }

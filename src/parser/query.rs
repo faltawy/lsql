@@ -1,7 +1,10 @@
 // Query parsing module
 use super::condition;
 use super::selection;
-use super::types::{ConditionNode, LSQLParser, Pair, Pairs, QueryType, Rule, SelectionType};
+use super::types::{
+    ConditionNode, LSQLParser, OrderDirection, OrderTerm, Pair, Pairs, QueryType, Rule,
+    SelectionType,
+};
 use log::{debug, trace, warn};
 use pest::Parser;
 
@@ -20,6 +23,8 @@ pub struct Query {
     pub limit: Option<u64>,
     /// Whether to perform recursive operations (for DELETE queries)
     pub is_recursive: bool,
+    /// Optional order by terms for sorting results
+    pub order_by: Vec<OrderTerm>,
 }
 
 impl LSQLParser {
@@ -42,6 +47,7 @@ impl LSQLParser {
         let mut condition = None;
         let mut limit = None;
         let mut is_recursive = false;
+        let mut order_by = Vec::new();
 
         // Process each part of the query
         for pair in pairs {
@@ -67,6 +73,10 @@ impl LSQLParser {
                                 debug!("Found where_clause: {}", select_part.as_str());
                                 condition =
                                     Some(condition::parse_condition(select_part.into_inner()));
+                            }
+                            Rule::order_by_clause => {
+                                debug!("Found order_by_clause: {}", select_part.as_str());
+                                order_by = parse_order_by(select_part.into_inner());
                             }
                             Rule::limit_clause => {
                                 debug!("Found limit_clause: {}", select_part.as_str());
@@ -131,7 +141,7 @@ impl LSQLParser {
         }
 
         debug!(
-            "Parsed query: type={:?}, selection={:?}, path={}, condition={}, limit={}, recursive={}",
+            "Parsed query: type={:?}, selection={:?}, path={}, condition={}, limit={}, recursive={}, order_by={}",
             query_type,
             selection,
             path,
@@ -145,7 +155,12 @@ impl LSQLParser {
             } else {
                 "none".to_string()
             },
-            is_recursive
+            is_recursive,
+            if order_by.is_empty() {
+                "none".to_string()
+            } else {
+                format!("{} terms", order_by.len())
+            }
         );
 
         Ok(Query {
@@ -155,6 +170,7 @@ impl LSQLParser {
             condition,
             limit,
             is_recursive,
+            order_by,
         })
     }
 }
@@ -242,7 +258,13 @@ fn parse_limit(mut pairs: Pairs<Rule>) -> u64 {
         let number_str = number_pair.as_str();
         trace!("Limit number string: '{}'", number_str);
 
-        match number_str.parse::<u64>() {
+        // Parse the number, ignoring any size units
+        let number_only = number_str
+            .chars()
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect::<String>();
+
+        match number_only.parse::<u64>() {
             Ok(n) => {
                 debug!("Parsed limit: {}", n);
                 n
@@ -257,6 +279,64 @@ fn parse_limit(mut pairs: Pairs<Rule>) -> u64 {
         debug!("No limit specified, defaulting to 100");
         100
     }
+}
+
+/// Parse the order by clause
+fn parse_order_by(mut pairs: Pairs<Rule>) -> Vec<OrderTerm> {
+    let mut order_by = Vec::new();
+
+    while let Some(order_term_pair) = pairs.next() {
+        trace!("Processing order_term: {:?}", order_term_pair.as_rule());
+
+        match order_term_pair.as_rule() {
+            Rule::order_term => {
+                let term = parse_order_term(order_term_pair.into_inner());
+                order_by.push(term);
+            }
+            _ => {
+                trace!(
+                    "Found unknown rule in order_by_clause: {}",
+                    order_term_pair.as_str()
+                );
+            }
+        }
+    }
+
+    order_by
+}
+
+/// Parse an order term
+fn parse_order_term(mut pairs: Pairs<Rule>) -> OrderTerm {
+    let mut field = String::new();
+    let mut direction = OrderDirection::Ascending;
+
+    while let Some(part) = pairs.next() {
+        trace!("Processing order_term_part: {:?}", part.as_rule());
+
+        match part.as_rule() {
+            Rule::field => {
+                debug!("Found field: {}", part.as_str());
+                field = part.as_str().to_string();
+            }
+            Rule::order_direction => {
+                debug!("Found direction: {}", part.as_str());
+                let dir_str = part.as_str().to_lowercase();
+                direction = match dir_str.as_str() {
+                    "asc" => OrderDirection::Ascending,
+                    "desc" => OrderDirection::Descending,
+                    _ => {
+                        warn!("Unknown direction: {}, defaulting to Ascending", dir_str);
+                        OrderDirection::Ascending
+                    }
+                };
+            }
+            _ => {
+                trace!("Found unknown rule in order_term: {}", part.as_str());
+            }
+        }
+    }
+
+    OrderTerm { field, direction }
 }
 
 #[cfg(test)]
@@ -529,5 +609,37 @@ mod tests {
         assert_eq!(result.path, ".");
         assert!(result.condition.is_some());
         assert!(result.is_recursive, "Query should be recursive");
+    }
+
+    #[test]
+    fn test_order_by_clause() {
+        // Test with a single order by term
+        let query = "select * from . order by name;";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.order_by.len(), 1);
+        assert_eq!(result.order_by[0].field, "name");
+        assert_eq!(result.order_by[0].direction, OrderDirection::Ascending);
+
+        // Test with multiple order by terms
+        let query = "select * from . order by size desc, name asc;";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.order_by.len(), 2);
+        assert_eq!(result.order_by[0].field, "size");
+        assert_eq!(result.order_by[0].direction, OrderDirection::Descending);
+        assert_eq!(result.order_by[1].field, "name");
+        assert_eq!(result.order_by[1].direction, OrderDirection::Ascending);
+
+        // Test with order by and other clauses
+        let query = "select files from . where size > 1mb order by modified desc limit 10;";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert!(matches!(result.selection, SelectionType::Files));
+        assert!(result.condition.is_some());
+        assert_eq!(result.order_by.len(), 1);
+        assert_eq!(result.order_by[0].field, "modified");
+        assert_eq!(result.order_by[0].direction, OrderDirection::Descending);
+        assert_eq!(result.limit, Some(10));
     }
 }

@@ -10,12 +10,16 @@ WHERE     = _{ "where" }
 LIMIT     = _{ "limit" }
 DELETE    = _{ "delete" }
 RECURSIVE = _{ "recursive" | "r" }
+ORDER     = _{ "order" }
+BY        = _{ "by" }
+ASC       = _{ "asc" }
+DESC      = _{ "desc" }
 
 // Main query structure
 query = { (select_query | delete_query) ~ SEMICOLON? ~ EOI? }
 
 // SELECT query
-select_query = { select_clause ~ from_clause ~ where_clause? ~ limit_clause? }
+select_query = { select_clause ~ from_clause ~ where_clause? ~ order_by_clause? ~ limit_clause? }
 
 // DELETE query
 delete_query = { delete_clause ~ from_clause ~ where_clause? ~ limit_clause? }
@@ -51,9 +55,14 @@ field          = {
   | "is_readonly"
 }
 
+// ORDER BY clause
+order_by_clause = { ORDER ~ BY ~ order_term ~ ("," ~ order_term)* }
+order_term      = { field ~ order_direction? }
+order_direction = { ASC | DESC }
+
 // FROM clause - where to search
 from_clause =  { FROM ~ path }
-path        = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" | (!(WHITESPACE | ";" | WHERE) ~ ANY)+ }
+path        = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" | (!(WHITESPACE | ";" | WHERE | ORDER) ~ ANY)+ }
 
 // WHERE clause - conditions for filtering
 where_clause      = { WHERE ~ condition }

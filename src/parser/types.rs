@@ -23,6 +23,24 @@ pub enum SelectionType {
     Fields(Vec<String>),
 }
 
+// Represents the sort direction in ORDER BY
+#[derive(Debug, Clone, PartialEq)]
+pub enum OrderDirection {
+    /// Ascending order (default)
+    Ascending,
+    /// Descending order
+    Descending,
+}
+
+// Represents a term in the ORDER BY clause
+#[derive(Debug, Clone)]
+pub struct OrderTerm {
+    /// Field to sort by
+    pub field: String,
+    /// Direction to sort (ascending or descending)
+    pub direction: OrderDirection,
+}
+
 // Represents a comparison operation in the WHERE clause
 #[derive(Debug, Clone)]
 pub enum ComparisonOperator {
