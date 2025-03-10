@@ -4,6 +4,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
 use log::{debug, info, warn};
+use std::io::Write;
 
 use crate::display;
 use crate::fs;
@@ -344,6 +345,28 @@ impl CLI {
                 display::display_results(&results, &query.selection, theme, self.use_color)?;
             }
             QueryType::Delete => {
+                // Show warning for recursive delete if not in dry run mode
+                if query.is_recursive && !self.dry_run {
+                    let warning = "WARNING: Performing recursive delete operation!";
+                    let message =
+                        display::format_message(warning, "warning", theme, self.use_color);
+                    println!("{}", message);
+
+                    // Ask for confirmation
+                    print!("Are you sure you want to continue? [y/N] ");
+                    std::io::stdout().flush().map_err(|e| e.to_string())?;
+
+                    let mut input = String::new();
+                    std::io::stdin()
+                        .read_line(&mut input)
+                        .map_err(|e| e.to_string())?;
+
+                    if !input.trim().eq_ignore_ascii_case("y") {
+                        println!("Operation cancelled.");
+                        return Ok(());
+                    }
+                }
+
                 // Execute DELETE query
                 let (failed_entries, deleted_count) =
                     fs::execute_delete_query(&query, &path, &search_context, self.dry_run)?;
@@ -351,13 +374,17 @@ impl CLI {
                 if self.dry_run {
                     // In dry run mode, show what would be deleted
                     println!("DRY RUN: The following entries would be deleted:");
-                    display::display_results(
-                        &failed_entries,
-                        &query.selection,
-                        theme,
-                        self.use_color,
-                    )?;
-                    println!("DRY RUN: {} entries would be deleted", failed_entries.len());
+                    if !failed_entries.is_empty() {
+                        display::display_results(
+                            &failed_entries,
+                            &query.selection,
+                            theme,
+                            self.use_color,
+                        )?;
+                        println!("DRY RUN: {} entries would be deleted", failed_entries.len());
+                    } else {
+                        println!("No entries match the criteria.");
+                    }
                 } else {
                     // Show results of the delete operation
                     if !failed_entries.is_empty() {
@@ -370,10 +397,20 @@ impl CLI {
                         )?;
                     }
 
-                    println!("Successfully deleted {} entries", deleted_count);
+                    if deleted_count > 0 {
+                        let success_msg = format!("Successfully deleted {} entries", deleted_count);
+                        let message =
+                            display::format_message(&success_msg, "success", theme, self.use_color);
+                        println!("{}", message);
+                    } else if failed_entries.is_empty() {
+                        println!("No entries match the criteria.");
+                    }
 
                     if !failed_entries.is_empty() {
-                        println!("Failed to delete {} entries", failed_entries.len());
+                        let fail_msg = format!("Failed to delete {} entries", failed_entries.len());
+                        let message =
+                            display::format_message(&fail_msg, "error", theme, self.use_color);
+                        println!("{}", message);
                     }
                 }
             }

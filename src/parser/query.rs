@@ -1,7 +1,7 @@
 // Query parsing module
 use super::condition;
 use super::selection;
-use super::types::{ConditionNode, LSQLParser, Pairs, QueryType, Rule, SelectionType};
+use super::types::{ConditionNode, LSQLParser, Pair, Pairs, QueryType, Rule, SelectionType};
 use log::{debug, trace, warn};
 use pest::Parser;
 
@@ -18,6 +18,8 @@ pub struct Query {
     pub condition: Option<ConditionNode>,
     /// Optional limit for restricting the number of results
     pub limit: Option<u64>,
+    /// Whether to perform recursive operations (for DELETE queries)
+    pub is_recursive: bool,
 }
 
 impl LSQLParser {
@@ -39,6 +41,7 @@ impl LSQLParser {
         let mut path = String::new();
         let mut condition = None;
         let mut limit = None;
+        let mut is_recursive = false;
 
         // Process each part of the query
         for pair in pairs {
@@ -87,6 +90,16 @@ impl LSQLParser {
                         match delete_part.as_rule() {
                             Rule::delete_clause => {
                                 debug!("Found delete_clause: {}", delete_part.as_str());
+
+                                // Check for recursive flag in the delete clause
+                                for inner_part in delete_part.clone().into_inner() {
+                                    if inner_part.as_rule() == Rule::recursive_flag {
+                                        debug!("Found recursive flag in delete clause");
+                                        is_recursive = true;
+                                        break;
+                                    }
+                                }
+
                                 selection = selection::parse_selection(delete_part.into_inner());
                             }
                             Rule::from_clause => {
@@ -118,7 +131,7 @@ impl LSQLParser {
         }
 
         debug!(
-            "Parsed query: type={:?}, selection={:?}, path={}, condition={}, limit={}",
+            "Parsed query: type={:?}, selection={:?}, path={}, condition={}, limit={}, recursive={}",
             query_type,
             selection,
             path,
@@ -131,7 +144,8 @@ impl LSQLParser {
                 l.to_string()
             } else {
                 "none".to_string()
-            }
+            },
+            is_recursive
         );
 
         Ok(Query {
@@ -140,7 +154,61 @@ impl LSQLParser {
             path,
             condition,
             limit,
+            is_recursive,
         })
+    }
+}
+
+/// Parse the from clause
+fn parse_from_clause(from_clause: Pair<Rule>) -> String {
+    // Extract the path from the from_clause
+    for part in from_clause.into_inner() {
+        if part.as_rule() == Rule::path {
+            return parse_path_string(part.as_str());
+        }
+    }
+
+    // Default to current directory if no path found
+    ".".to_string()
+}
+
+/// Parse the path string
+fn parse_path_string(path_str: &str) -> String {
+    // Remove quotes if present
+    if path_str.starts_with('"') && path_str.ends_with('"') {
+        path_str[1..path_str.len() - 1].to_string()
+    } else {
+        path_str.to_string()
+    }
+}
+
+/// Parse the limit clause
+fn parse_limit_clause(limit_clause: Pair<Rule>) -> u64 {
+    // Extract the number from the limit_clause
+    for part in limit_clause.into_inner() {
+        if part.as_rule() == Rule::number {
+            return parse_number(part.as_str());
+        }
+    }
+
+    // Default to 100 if no number found
+    100
+}
+
+/// Parse a number string to u64
+fn parse_number(number_str: &str) -> u64 {
+    // Parse the number, ignoring any size units
+    let number_only = number_str
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect::<String>();
+
+    match number_only.parse::<u64>() {
+        Ok(n) => n,
+        Err(_) => {
+            warn!("Invalid limit value: {}, defaulting to 100", number_str);
+            100 // Default to 100 if parsing fails
+        }
     }
 }
 
@@ -395,5 +463,71 @@ mod tests {
         assert_eq!(result.path, ".");
         assert!(result.limit.is_some());
         assert_eq!(result.limit.unwrap(), 5);
+    }
+
+    #[test]
+    fn test_delete_recursive() {
+        let query = "delete recursive * from .;";
+
+        // Debug: Print the parse tree
+        match LSQLParser::parse(Rule::query, query) {
+            Ok(pairs) => {
+                for pair in pairs {
+                    println!("Rule: {:?}", pair.as_rule());
+                    println!("Span: {:?}", pair.as_span());
+                    println!("Text: {}", pair.as_str());
+
+                    for inner_pair in pair.clone().into_inner() {
+                        println!("  Inner Rule: {:?}", inner_pair.as_rule());
+                        println!("  Inner Span: {:?}", inner_pair.as_span());
+                        println!("  Inner Text: {}", inner_pair.as_str());
+
+                        for inner_inner_pair in inner_pair.clone().into_inner() {
+                            println!("    Inner Inner Rule: {:?}", inner_inner_pair.as_rule());
+                            println!("    Inner Inner Span: {:?}", inner_inner_pair.as_span());
+                            println!("    Inner Inner Text: {}", inner_inner_pair.as_str());
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Parse error: {}", e);
+            }
+        }
+
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.query_type, QueryType::Delete);
+        assert!(matches!(result.selection, SelectionType::All));
+        assert_eq!(result.path, ".");
+        assert!(result.condition.is_none());
+        assert!(result.is_recursive, "Query should be recursive");
+    }
+
+    #[test]
+    fn test_delete_with_shorthand_recursive() {
+        let query = "delete r * from .;";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.query_type, QueryType::Delete);
+        assert!(matches!(result.selection, SelectionType::All));
+        assert_eq!(result.path, ".");
+        assert!(result.condition.is_none());
+        assert!(
+            result.is_recursive,
+            "Query should be recursive with shorthand 'r'"
+        );
+    }
+
+    #[test]
+    fn test_delete_recursive_with_condition() {
+        let query = "delete recursive files from . where ext = \"tmp\";";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.query_type, QueryType::Delete);
+        assert!(matches!(result.selection, SelectionType::Files));
+        assert_eq!(result.path, ".");
+        assert!(result.condition.is_some());
+        assert!(result.is_recursive, "Query should be recursive");
     }
 }

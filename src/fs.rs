@@ -290,8 +290,15 @@ pub fn delete_entries(
         let path = std::path::Path::new(&entry.path);
 
         let result = if entry.is_dir {
-            debug!("Deleting directory: {}", entry.path);
-            std::fs::remove_dir_all(path)
+            if recursive {
+                // If recursive flag is set, delete directory and all its contents
+                debug!("Recursively deleting directory: {}", entry.path);
+                std::fs::remove_dir_all(path)
+            } else {
+                // If not recursive, only delete if directory is empty
+                debug!("Deleting directory (if empty): {}", entry.path);
+                std::fs::remove_dir(path)
+            }
         } else {
             debug!("Deleting file: {}", entry.path);
             std::fs::remove_file(path)
@@ -303,7 +310,25 @@ pub fn delete_entries(
             }
             Err(e) => {
                 warn!("Failed to delete {}: {}", entry.path, e);
-                failed_entries.push(entry.clone());
+
+                // Add more descriptive error message based on error kind
+                let error_msg = match e.kind() {
+                    std::io::ErrorKind::PermissionDenied => {
+                        format!("Permission denied: {}", entry.path)
+                    }
+                    std::io::ErrorKind::NotFound => {
+                        format!("No such file or directory: {}", entry.path)
+                    }
+                    std::io::ErrorKind::DirectoryNotEmpty => format!(
+                        "Directory not empty (use recursive flag to delete): {}",
+                        entry.path
+                    ),
+                    _ => format!("Failed to delete {}: {}", entry.path, e),
+                };
+
+                let mut failed_entry = entry.clone();
+                failed_entry.name = format!("{} - {}", failed_entry.name, error_msg);
+                failed_entries.push(failed_entry);
             }
         }
     }
@@ -326,12 +351,20 @@ pub fn execute_delete_query(
         &query.path
     };
 
+    // Use the is_recursive flag from the query if it's a DELETE query,
+    // otherwise fall back to the context's recursive flag
+    let recursive = if query.query_type == crate::parser::QueryType::Delete {
+        query.is_recursive || context.recursive
+    } else {
+        context.recursive
+    };
+
     delete_entries(
         path_to_search,
         &query.selection,
         &query.condition,
         query.limit,
-        context.recursive,
+        recursive,
         dry_run,
     )
 }
@@ -564,5 +597,169 @@ mod tests {
         // Verify the specific file was deleted
         let has_test_file_1 = after_entries.iter().any(|e| e.name.contains("test_file_1"));
         assert!(!has_test_file_1, "test_file_1.txt should be deleted");
+    }
+
+    #[test]
+    fn test_delete_entries_recursive() {
+        let temp_dir = setup_test_directory();
+        let dir_path = temp_dir.path().to_string_lossy().to_string();
+
+        // Create a nested directory structure
+        let nested_dir_path = temp_dir.path().join("nested_dir");
+        std::fs::create_dir(&nested_dir_path).unwrap();
+
+        // Create files in the nested directory
+        for i in 1..3 {
+            let file_path = nested_dir_path.join(format!("nested_file_{}.txt", i));
+            let mut file = File::create(file_path).unwrap();
+            writeln!(file, "Nested content {}", i).unwrap();
+        }
+
+        // Count directories before deletion
+        let before_dirs =
+            list_entries(&dir_path, &SelectionType::Directories, &None, None, false).unwrap();
+
+        let before_dir_count = before_dirs.len();
+        assert!(before_dir_count > 0, "Should have at least one directory");
+
+        // Try to delete a directory without recursive flag (should fail)
+        let (failed_entries, deleted_count) = delete_entries(
+            &dir_path,
+            &SelectionType::Directories,
+            &None,
+            Some(1),
+            false, // non-recursive
+            false, // actual deletion
+        )
+        .unwrap();
+
+        // Should have failed to delete the directory because it's not empty
+        assert_eq!(
+            deleted_count, 0,
+            "Should not delete any directories without recursive flag"
+        );
+        assert!(
+            failed_entries.len() > 0,
+            "Should have at least one failed deletion"
+        );
+        assert!(
+            failed_entries[0].name.contains("Directory not empty")
+                || failed_entries[0].name.contains("directory not empty"),
+            "Error message should mention directory not empty"
+        );
+
+        // Now delete with recursive flag
+        let (failed_entries, deleted_count) = delete_entries(
+            &dir_path,
+            &SelectionType::Directories,
+            &None,
+            Some(1),
+            true,  // recursive
+            false, // actual deletion
+        )
+        .unwrap();
+
+        // Should have successfully deleted the directory
+        assert!(deleted_count > 0, "Should delete at least one directory");
+        assert_eq!(
+            failed_entries.len(),
+            0,
+            "Should not have any failed deletions"
+        );
+
+        // Verify directory was deleted
+        let after_dirs =
+            list_entries(&dir_path, &SelectionType::Directories, &None, None, false).unwrap();
+
+        assert!(
+            after_dirs.len() < before_dir_count,
+            "At least one directory should be deleted"
+        );
+    }
+
+    #[test]
+    fn test_delete_entries_with_nested_structure() {
+        let temp_dir = setup_test_directory();
+        let dir_path = temp_dir.path().to_string_lossy().to_string();
+
+        // Create a deeper nested directory structure
+        let level1_dir = temp_dir.path().join("level1");
+        std::fs::create_dir(&level1_dir).unwrap();
+
+        let level2_dir = level1_dir.join("level2");
+        std::fs::create_dir(&level2_dir).unwrap();
+
+        let level3_dir = level2_dir.join("level3");
+        std::fs::create_dir(&level3_dir).unwrap();
+
+        // Create files at each level
+        for i in 1..3 {
+            let file_path = level1_dir.join(format!("level1_file_{}.txt", i));
+            let mut file = File::create(file_path).unwrap();
+            writeln!(file, "Level 1 content {}", i).unwrap();
+
+            let file_path = level2_dir.join(format!("level2_file_{}.txt", i));
+            let mut file = File::create(file_path).unwrap();
+            writeln!(file, "Level 2 content {}", i).unwrap();
+
+            let file_path = level3_dir.join(format!("level3_file_{}.txt", i));
+            let mut file = File::create(file_path).unwrap();
+            writeln!(file, "Level 3 content {}", i).unwrap();
+        }
+
+        // Count all entries recursively before deletion
+        let before_entries = list_entries(
+            &dir_path,
+            &SelectionType::All,
+            &None,
+            None,
+            true, // recursive
+        )
+        .unwrap();
+
+        let before_count = before_entries.len();
+
+        // Delete the top-level directory recursively
+        let (failed_entries, deleted_count) = delete_entries(
+            &dir_path,
+            &SelectionType::Directories,
+            &Some(ConditionNode::Leaf(Condition {
+                identifier: "name".to_string(),
+                operator: ComparisonOperator::Equal,
+                value: Value::String("level1".to_string()),
+            })),
+            None,
+            true,  // recursive
+            false, // actual deletion
+        )
+        .unwrap();
+
+        // Should have successfully deleted the directory and all its contents
+        assert_eq!(deleted_count, 1, "Should delete one directory");
+        assert_eq!(
+            failed_entries.len(),
+            0,
+            "Should not have any failed deletions"
+        );
+
+        // Verify directory and all its contents were deleted
+        let after_entries = list_entries(
+            &dir_path,
+            &SelectionType::All,
+            &None,
+            None,
+            true, // recursive
+        )
+        .unwrap();
+
+        // The count should be reduced by at least 9 entries (3 directories + 6 files)
+        assert!(
+            before_count - after_entries.len() >= 9,
+            "Should have deleted at least 9 entries (3 dirs + 6 files)"
+        );
+
+        // Verify the level1 directory no longer exists
+        let has_level1 = after_entries.iter().any(|e| e.name == "level1");
+        assert!(!has_level1, "level1 directory should be deleted");
     }
 }

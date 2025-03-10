@@ -21,10 +21,11 @@ select_query = { select_clause ~ from_clause ~ where_clause? ~ limit_clause? }
 delete_query = { delete_clause ~ from_clause ~ where_clause? ~ limit_clause? }
 
 // SELECT clause - what to select (files, directories, or both)
-select_clause = { SELECT ~ selection }
-delete_clause = { DELETE ~ selection ~ RECURSIVE? }
-limit_clause  = { LIMIT ~ number }
-selection     = {
+select_clause  = { SELECT ~ selection }
+delete_clause  = { DELETE ~ recursive_flag? ~ selection }
+recursive_flag = { RECURSIVE }
+limit_clause   = { LIMIT ~ number }
+selection      = {
     "*"
   | // all items
   "files"
@@ -36,8 +37,8 @@ selection     = {
   | // only directories
   field_list // specific fields
 }
-field_list    = { field ~ ("," ~ field)* }
-field         = {
+field_list     = { field ~ ("," ~ field)* }
+field          = {
     "name"
   | "path"
   | "size"

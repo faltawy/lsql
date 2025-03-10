@@ -53,6 +53,12 @@ pub fn parse_selection(mut pairs: Pairs<Rule>) -> SelectionType {
                     }
                 }
             }
+            Rule::recursive_flag => {
+                // Skip the recursive flag, it's handled in the query parser
+                if let Some(next_pair) = pairs.next() {
+                    return parse_selection(Pairs::single(next_pair));
+                }
+            }
             _ => {
                 debug!(
                     "Unexpected rule in selection: {:?}",
