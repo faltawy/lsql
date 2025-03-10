@@ -89,18 +89,18 @@ fn get_header_row(selection: &SelectionType, theme: &Theme, use_color: bool) -> 
         cell
     };
 
-    // Default columns
-    row.add_cell(create_header_cell("Name"));
-
-    // Add additional columns based on selection
+    // Add columns based on selection
     match selection {
         SelectionType::All | SelectionType::Files | SelectionType::Directories => {
+            // Default columns for All, Files, or Directories selection
+            row.add_cell(create_header_cell("Name"));
             row.add_cell(create_header_cell("Type"));
             row.add_cell(create_header_cell("Size"));
             row.add_cell(create_header_cell("Modified"));
             row.add_cell(create_header_cell("Permissions"));
         }
         SelectionType::Fields(fields) => {
+            // For field selection, only add the specified fields
             for field in fields {
                 row.add_cell(create_header_cell(field));
             }
@@ -143,11 +143,12 @@ fn get_entry_row(
         None => Cell::new(&name_text),
     };
 
-    row.add_cell(name_cell);
-
-    // Add additional columns based on selection
+    // Add columns based on selection
     match selection {
         SelectionType::All | SelectionType::Files | SelectionType::Directories => {
+            // Add name as the first column
+            row.add_cell(name_cell);
+
             // Type column
             let type_str = if entry.is_dir { "dir" } else { "file" };
             row.add_cell(Cell::new(type_str));
@@ -168,9 +169,12 @@ fn get_entry_row(
             row.add_cell(Cell::new(&entry.permissions));
         }
         SelectionType::Fields(fields) => {
+            // For field selection, add cells in the order specified
             for field in fields {
                 match field.as_str() {
-                    "name" => {} // Already added
+                    "name" => {
+                        row.add_cell(name_cell.clone());
+                    }
                     "path" => {
                         // Apply italics to path if theme says so
                         let path_text = if theme.styles.italicize_paths && use_color {
@@ -198,14 +202,12 @@ fn get_entry_row(
                     "permissions" => {
                         row.add_cell(Cell::new(&entry.permissions));
                     }
+                    "type" => {
+                        let type_str = if entry.is_dir { "dir" } else { "file" };
+                        row.add_cell(Cell::new(type_str));
+                    }
                     "is_hidden" => {
                         row.add_cell(Cell::new(entry.is_hidden.to_string()));
-                    }
-                    "is_dir" => {
-                        row.add_cell(Cell::new(entry.is_dir.to_string()));
-                    }
-                    "is_file" => {
-                        row.add_cell(Cell::new(entry.is_file.to_string()));
                     }
                     _ => {
                         row.add_cell(Cell::new("-"));

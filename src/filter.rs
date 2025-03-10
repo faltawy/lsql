@@ -136,6 +136,25 @@ impl ConditionMatcher for FSEntry {
                     false
                 }
             },
+            "type" => match value {
+                Value::String(s) => {
+                    let type_str = if self.is_dir { "dir" } else { "file" };
+                    match operator {
+                        ComparisonOperator::Equal => type_str == s,
+                        ComparisonOperator::NotEqual => type_str != s,
+                        ComparisonOperator::Like => type_str.contains(s),
+                        ComparisonOperator::Contains => type_str.contains(s),
+                        _ => {
+                            warn!("Invalid operator for type comparison: {:?}", operator);
+                            false
+                        }
+                    }
+                }
+                _ => {
+                    warn!("Invalid value type for type comparison: {:?}", value);
+                    false
+                }
+            },
             _ => {
                 warn!("Unknown field identifier: {}", identifier);
                 false
