@@ -3,13 +3,13 @@
 
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
-use log::{debug, info, warn};
+use log::{debug, warn};
 use std::io::Write;
 
 use crate::display;
 use crate::fs;
 use crate::parser::{LSQLParser, QueryType};
-use crate::theme::{self, Theme, ThemeManager};
+use crate::theme::{Theme, ThemeManager};
 
 // Define the log level enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
