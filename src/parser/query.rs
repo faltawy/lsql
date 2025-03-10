@@ -2,8 +2,7 @@
 use super::condition;
 use super::selection;
 use super::types::{
-    ConditionNode, LSQLParser, OrderDirection, OrderTerm, Pair, Pairs, QueryType, Rule,
-    SelectionType,
+    ConditionNode, LSQLParser, OrderDirection, OrderTerm, Pairs, QueryType, Rule, SelectionType,
 };
 use log::{debug, trace, warn};
 use pest::Parser;
@@ -172,59 +171,6 @@ impl LSQLParser {
             is_recursive,
             order_by,
         })
-    }
-}
-
-/// Parse the from clause
-fn parse_from_clause(from_clause: Pair<Rule>) -> String {
-    // Extract the path from the from_clause
-    for part in from_clause.into_inner() {
-        if part.as_rule() == Rule::path {
-            return parse_path_string(part.as_str());
-        }
-    }
-
-    // Default to current directory if no path found
-    ".".to_string()
-}
-
-/// Parse the path string
-fn parse_path_string(path_str: &str) -> String {
-    // Remove quotes if present
-    if path_str.starts_with('"') && path_str.ends_with('"') {
-        path_str[1..path_str.len() - 1].to_string()
-    } else {
-        path_str.to_string()
-    }
-}
-
-/// Parse the limit clause
-fn parse_limit_clause(limit_clause: Pair<Rule>) -> u64 {
-    // Extract the number from the limit_clause
-    for part in limit_clause.into_inner() {
-        if part.as_rule() == Rule::number {
-            return parse_number(part.as_str());
-        }
-    }
-
-    // Default to 100 if no number found
-    100
-}
-
-/// Parse a number string to u64
-fn parse_number(number_str: &str) -> u64 {
-    // Parse the number, ignoring any size units
-    let number_only = number_str
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .collect::<String>();
-
-    match number_only.parse::<u64>() {
-        Ok(n) => n,
-        Err(_) => {
-            warn!("Invalid limit value: {}, defaulting to 100", number_str);
-            100 // Default to 100 if parsing fails
-        }
     }
 }
 

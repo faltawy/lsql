@@ -61,7 +61,6 @@ enum ShellError {
     ExecutionError(String),
     UnknownCommand(String),
     IoError(io::Error),
-    InternalError(String),
 }
 
 impl From<io::Error> for ShellError {
@@ -178,14 +177,6 @@ impl LSQLShell {
             ShellError::IoError(err) => {
                 eprintln!("{} I/O error: {}", Color::Red.bold().paint("Error:"), err);
                 error!("I/O error: {}", err);
-            }
-            ShellError::InternalError(msg) => {
-                eprintln!(
-                    "{} Internal error: {}",
-                    Color::Red.bold().paint("Error:"),
-                    msg
-                );
-                error!("Internal error: {}", msg);
             }
         }
     }

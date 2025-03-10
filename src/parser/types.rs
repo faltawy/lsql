@@ -160,11 +160,11 @@ mod tests {
 
         // Ensure each variant is distinct
         for (i, op1) in ops.iter().enumerate() {
-            for (j, op2) in ops.iter().enumerate() {
+            for (j, _op2) in ops.iter().enumerate() {
                 if i == j {
-                    assert!(matches!(op1, op2));
+                    assert!(matches!(op1, _op2));
                 } else {
-                    assert!(!std::mem::discriminant(op1).eq(&std::mem::discriminant(op2)));
+                    assert!(!std::mem::discriminant(op1).eq(&std::mem::discriminant(&ops[j])));
                 }
             }
         }
