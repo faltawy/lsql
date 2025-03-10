@@ -926,7 +926,7 @@ dependencies = [
 
 [[package]]
 name = "lsql"
-version = "0.0.1"
+version = "1.5.1"
 dependencies = [
  "chrono",
  "clap",
