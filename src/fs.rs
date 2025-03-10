@@ -258,3 +258,144 @@ pub fn execute_query(
         context.recursive,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::{ComparisonOperator, Condition, ConditionNode, SelectionType, Value};
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    // Helper function to create a temporary directory with test files
+    fn setup_test_directory() -> tempfile::TempDir {
+        let dir = tempdir().unwrap();
+
+        // Create some test files
+        for i in 1..10 {
+            let file_path = dir.path().join(format!("test_file_{}.txt", i));
+            let mut file = File::create(file_path).unwrap();
+            writeln!(file, "Test content {}", i).unwrap();
+        }
+
+        // Create a subdirectory
+        let subdir_path = dir.path().join("subdir");
+        std::fs::create_dir(&subdir_path).unwrap();
+
+        // Create files in the subdirectory
+        for i in 1..5 {
+            let file_path = subdir_path.join(format!("subdir_file_{}.txt", i));
+            let mut file = File::create(file_path).unwrap();
+            writeln!(file, "Subdir content {}", i).unwrap();
+        }
+
+        dir
+    }
+
+    #[test]
+    fn test_limit_entries() {
+        let temp_dir = setup_test_directory();
+        let dir_path = temp_dir.path().to_string_lossy().to_string();
+
+        // Test with limit of 3
+        let entries = list_entries(&dir_path, &SelectionType::All, &None, Some(3), false).unwrap();
+
+        assert_eq!(entries.len(), 3, "Should return exactly 3 entries");
+
+        // Test with limit of 0 (should return empty list)
+        let zero_entries =
+            list_entries(&dir_path, &SelectionType::All, &None, Some(0), false).unwrap();
+
+        assert_eq!(
+            zero_entries.len(),
+            0,
+            "Should return empty list with limit 0"
+        );
+
+        // Test with limit larger than available entries
+        let all_entries =
+            list_entries(&dir_path, &SelectionType::All, &None, Some(100), false).unwrap();
+
+        // Should return all entries in the directory (not recursive)
+        assert!(all_entries.len() > 0, "Should return all entries");
+        assert!(
+            all_entries.len() <= 10,
+            "Should not exceed actual entry count"
+        );
+
+        // Test with no limit
+        let unlimited_entries =
+            list_entries(&dir_path, &SelectionType::All, &None, None, false).unwrap();
+
+        assert_eq!(
+            unlimited_entries.len(),
+            all_entries.len(),
+            "No limit should return all entries"
+        );
+    }
+
+    #[test]
+    fn test_limit_with_recursive() {
+        let temp_dir = setup_test_directory();
+        let dir_path = temp_dir.path().to_string_lossy().to_string();
+
+        // Test with limit and recursive flag
+        let entries = list_entries(&dir_path, &SelectionType::All, &None, Some(5), true).unwrap();
+
+        assert_eq!(
+            entries.len(),
+            5,
+            "Should return exactly 5 entries with recursive search"
+        );
+
+        // Get all entries recursively
+        let all_entries = list_entries(&dir_path, &SelectionType::All, &None, None, true).unwrap();
+
+        // Should include files from subdirectories
+        assert!(
+            all_entries.len() > 10,
+            "Should include files from subdirectories"
+        );
+    }
+
+    #[test]
+    fn test_limit_with_selection_and_condition() {
+        let temp_dir = setup_test_directory();
+        let dir_path = temp_dir.path().to_string_lossy().to_string();
+
+        // Test with files selection and limit
+        let file_entries =
+            list_entries(&dir_path, &SelectionType::Files, &None, Some(4), false).unwrap();
+
+        assert_eq!(
+            file_entries.len(),
+            4,
+            "Should return exactly 4 file entries"
+        );
+        assert!(
+            file_entries.iter().all(|e| e.is_file),
+            "All entries should be files"
+        );
+
+        // Create a simple condition for testing
+        let condition = Some(ConditionNode::Leaf(Condition {
+            identifier: "name".to_string(),
+            operator: ComparisonOperator::Contains,
+            value: Value::String("test_file".to_string()),
+        }));
+
+        // Test with condition and limit
+        let filtered_entries =
+            list_entries(&dir_path, &SelectionType::All, &condition, Some(2), false).unwrap();
+
+        assert!(filtered_entries.len() <= 2, "Should not exceed limit of 2");
+
+        // Verify that the condition was applied before the limit
+        for entry in &filtered_entries {
+            assert!(
+                entry.name.contains("test_file"),
+                "Entry should match the condition"
+            );
+        }
+    }
+}

@@ -14,9 +14,9 @@ keywords = ["cli", "sql", "filesystem", "query", "search"]
 categories = ["command-line-utilities", "filesystem"]
 
 [profile.release]
-opt-level = 3
 lto = true
 codegen-units = 1
+opt-level = 3
 
 [dependencies]
 walkdir = "2.5.0"
@@ -39,6 +39,7 @@ nu-plugin = "0.102.0"
 syntect = "5.1.0"
 miette = { version = "7.5.0", features = ["fancy"] }
 regex = "1.10.3"
+tempfile = "3.10.1"
 
 [[bin]]
 name = "lsql"

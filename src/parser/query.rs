@@ -259,6 +259,7 @@ mod tests {
 
     #[test]
     fn test_limit_clause() {
+        // Basic limit clause
         let query = "select * from . limit 5;";
         let result = LSQLParser::parse_query(query).unwrap();
 
@@ -273,5 +274,27 @@ mod tests {
         assert!(result_with_condition.limit.is_some());
         let limit_with_condition = result_with_condition.limit.unwrap();
         assert_eq!(limit_with_condition, 10);
+
+        // Test with zero limit
+        let query_zero_limit = "select * from . limit 0;";
+        let result_zero_limit = LSQLParser::parse_query(query_zero_limit).unwrap();
+
+        assert!(result_zero_limit.limit.is_some());
+        let zero_limit = result_zero_limit.limit.unwrap();
+        assert_eq!(zero_limit, 0);
+
+        // Test with large limit
+        let query_large_limit = "select * from . limit 1000000;";
+        let result_large_limit = LSQLParser::parse_query(query_large_limit).unwrap();
+
+        assert!(result_large_limit.limit.is_some());
+        let large_limit = result_large_limit.limit.unwrap();
+        assert_eq!(large_limit, 1000000);
+
+        // Test without limit clause
+        let query_no_limit = "select * from .;";
+        let result_no_limit = LSQLParser::parse_query(query_no_limit).unwrap();
+
+        assert!(result_no_limit.limit.is_none());
     }
 }
