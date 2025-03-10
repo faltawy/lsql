@@ -78,6 +78,8 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.target.rust }}-${{ matrix.os }}
 
     - name: Install cross (Linux only)
       if: matrix.os == 'ubuntu-latest'
