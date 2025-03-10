@@ -146,6 +146,7 @@ pub fn list_entries(
     path: &str,
     selection: &SelectionType,
     condition: &Option<ConditionNode>,
+    limit: Option<u64>,
     recursive: bool,
 ) -> Result<Vec<FSEntry>, String> {
     let path = normalize_path(path)?;
@@ -189,7 +190,15 @@ pub fn list_entries(
     }
 
     // Apply condition filtering using the filter module
-    let filtered_entries = crate::filter::filter_entries(entries, condition);
+    let mut filtered_entries = crate::filter::filter_entries(entries, condition);
+
+    // Apply limit if specified
+    if let Some(limit_val) = limit {
+        if filtered_entries.len() > limit_val as usize {
+            debug!("Limiting results to {} entries", limit_val);
+            filtered_entries.truncate(limit_val as usize);
+        }
+    }
 
     debug!("Found {} entries after filtering", filtered_entries.len());
     Ok(filtered_entries)
@@ -245,6 +254,7 @@ pub fn execute_query(
         path_to_search,
         &query.selection,
         &query.condition,
+        query.limit,
         context.recursive,
     )
 }

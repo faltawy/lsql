@@ -1,47 +1,75 @@
 // LSQL Grammar - SQL-like syntax for querying files and directories
 // Whitespace and comments
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
-COMMENT = _{ "--" ~ (!"\n" ~ ANY)* ~ "\n"? }
-SEMICOLON = _{ ";" }
+COMMENT    = _{ "--" ~ (!"\n" ~ ANY)* ~ "\n"? }
+SEMICOLON  = _{ ";" }
+// Keywords
+SELECT = _{ "select" }
+FROM   = _{ "from" }
+WHERE  = _{ "where" }
+LIMIT  = _{ "limit" }
+
 // Main query structure
-query = { select_clause ~ from_clause ~ where_clause? ~ SEMICOLON? ~ EOI? }
+query = { select_clause ~ from_clause ~ where_clause? ~ limit_clause? ~ SEMICOLON? ~ EOI? }
 
 // SELECT clause - what to select (files, directories, or both)
-select_clause = { "select" ~ selection }
-selection = { 
-    "*" |                              // all items
-    "files" | "f" |                    // only files
-    "directories" | "dirs" | "d" |     // only directories
-    field_list                          // specific fields
+select_clause = { SELECT ~ selection }
+limit_clause  = { LIMIT ~ number }
+selection     = {
+    "*"
+  | // all items
+  "files"
+  | "f"
+  | // only files
+  "directories"
+  | "dirs"
+  | "d"
+  | // only directories
+  field_list // specific fields
 }
-field_list = { field ~ ("," ~ field)* }
-field = { 
-    "name" | "path" | "size" | "modified" | "created" | "ext" | 
-    "permissions" | "owner" | "is_hidden" | "is_readonly" 
+field_list    = { field ~ ("," ~ field)* }
+field         = {
+    "name"
+  | "path"
+  | "size"
+  | "modified"
+  | "created"
+  | "ext"
+  | "permissions"
+  | "owner"
+  | "is_hidden"
+  | "is_readonly"
 }
 
 // FROM clause - where to search
-from_clause = { "from" ~ path }
-path = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" | (!(WHITESPACE | ";" | "where") ~ ANY)+ }
+from_clause =  { FROM ~ path }
+path        = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" | (!(WHITESPACE | ";" | WHERE) ~ ANY)+ }
 
 // WHERE clause - conditions for filtering
-where_clause = { "where" ~ condition }
-condition = { 
-    primary_condition ~ (boolean_operator ~ primary_condition)* 
+where_clause      = { WHERE ~ condition }
+condition         = {
+    primary_condition ~ (boolean_operator ~ primary_condition)*
 }
 primary_condition = {
-    "(" ~ condition ~ ")" |
-    comparison
+    "(" ~ condition ~ ")"
+  | comparison
 }
-comparison = { identifier ~ comparison_operator ~ value }
-identifier = { "name" | "path" | "size" | "modified" | "created" | "ext" | "permissions" | "owner" | "is_hidden" | "is_readonly" }
+comparison        = { identifier ~ comparison_operator ~ value }
+identifier        = { "name" | "path" | "size" | "modified" | "created" | "ext" | "permissions" | "owner" | "is_hidden" | "is_readonly" }
 // The ordering is important - check for multi-character operators first
-comparison_operator = { 
-    "<=" | ">=" | "=" | "!=" | "<" | ">" | "like" | "contains" 
+comparison_operator =  {
+    "<="
+  | ">="
+  | "="
+  | "!="
+  | "<"
+  | ">"
+  | "like"
+  | "contains"
 }
-value = @{ string | number | bool }
-string = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" }
-number = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ size_unit? }
-size_unit = { "kb" | "mb" | "gb" | "tb" | "b" }
-bool = { "true" | "false" }
-boolean_operator = { "and" | "or" }
+value               = @{ string | number | bool }
+string              = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" }
+number              = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ size_unit? }
+size_unit           =  { "kb" | "mb" | "gb" | "tb" | "b" }
+bool                =  { "true" | "false" }
+boolean_operator    =  { "and" | "or" }

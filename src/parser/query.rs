@@ -14,6 +14,8 @@ pub struct Query {
     pub path: String,
     /// Optional condition for filtering
     pub condition: Option<ConditionNode>,
+    /// Optional limit for restricting the number of results
+    pub limit: Option<u64>,
 }
 
 impl LSQLParser {
@@ -33,6 +35,7 @@ impl LSQLParser {
         let mut selection = SelectionType::All;
         let mut path = String::new();
         let mut condition = None;
+        let mut limit = None;
 
         // Process each part of the query
         for pair in pairs {
@@ -51,6 +54,10 @@ impl LSQLParser {
                     debug!("Found where_clause: {}", pair.as_str());
                     condition = Some(condition::parse_condition(pair.into_inner()));
                 }
+                Rule::limit_clause => {
+                    debug!("Found limit_clause: {}", pair.as_str());
+                    limit = Some(parse_limit(pair.into_inner()));
+                }
                 _ => {
                     trace!("Found unknown rule: {}", pair.as_str());
                 }
@@ -58,13 +65,18 @@ impl LSQLParser {
         }
 
         debug!(
-            "Parsed query: selection={:?}, path={}, condition={}",
+            "Parsed query: selection={:?}, path={}, condition={}, limit={}",
             selection,
             path,
             if condition.is_some() {
                 "present"
             } else {
                 "none"
+            },
+            if let Some(l) = limit {
+                l.to_string()
+            } else {
+                "none".to_string()
             }
         );
 
@@ -72,6 +84,7 @@ impl LSQLParser {
             selection,
             path,
             condition,
+            limit,
         })
     }
 }
@@ -96,6 +109,30 @@ fn parse_path(mut pairs: Pairs<Rule>) -> String {
         // Default to current directory if no path specified
         debug!("No path specified, defaulting to current directory '.'");
         ".".to_string()
+    }
+}
+
+/// Parse the limit part of the query
+fn parse_limit(mut pairs: Pairs<Rule>) -> u64 {
+    // Get the number pair
+    if let Some(number_pair) = pairs.next() {
+        let number_str = number_pair.as_str();
+        trace!("Limit number string: '{}'", number_str);
+
+        match number_str.parse::<u64>() {
+            Ok(n) => {
+                debug!("Parsed limit: {}", n);
+                n
+            }
+            Err(_) => {
+                warn!("Invalid limit value: {}, defaulting to 100", number_str);
+                100 // Default to 100 if parsing fails
+            }
+        }
+    } else {
+        // Default to 100 if no limit specified
+        debug!("No limit specified, defaulting to 100");
+        100
     }
 }
 
@@ -218,5 +255,23 @@ mod tests {
         };
 
         assert!(top_level_or, "Expected a top-level OR branch");
+    }
+
+    #[test]
+    fn test_limit_clause() {
+        let query = "select * from . limit 5;";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert!(result.limit.is_some());
+        let limit = result.limit.unwrap();
+        assert_eq!(limit, 5);
+
+        // Test with a condition and limit
+        let query_with_condition = "select files from . where size > 1mb limit 10;";
+        let result_with_condition = LSQLParser::parse_query(query_with_condition).unwrap();
+
+        assert!(result_with_condition.limit.is_some());
+        let limit_with_condition = result_with_condition.limit.unwrap();
+        assert_eq!(limit_with_condition, 10);
     }
 }
