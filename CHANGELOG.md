@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.1.0](https://github.com/faltawy/lsql/compare/v1.0.0...v1.1.0) (2025-03-10)
+
+### Features
+
+* **parser:** Enhance query parsing with optional semicolon and improved path matching ([e9e811e](https://github.com/faltawy/lsql/commit/e9e811ed5b56aeae0daf8730898c2bbce4a4604f))
+
 ## 1.0.0 (2025-03-10)
 
 ### Features
