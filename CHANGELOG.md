@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.2.0](https://github.com/faltawy/lsql/compare/v1.1.0...v1.2.0) (2025-03-10)
+
+### Features
+
+* **cli:** Change default log level to 'off' ([8ae8ef6](https://github.com/faltawy/lsql/commit/8ae8ef6afeb7f2c5b49c4a58a4597b4fb38194b5))
+
 ## [1.1.0](https://github.com/faltawy/lsql/compare/v1.0.0...v1.1.0) (2025-03-10)
 
 ### Features
