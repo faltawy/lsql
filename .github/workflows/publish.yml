@@ -18,9 +18,8 @@ jobs:
   semantic-versioning:
     name: Determine version
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     outputs:
-      new_version: ${{ steps.semantic.outputs.new_version }}
+      new_version: ${{ steps.semantic.outputs.new_release_version }}
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       changelog: ${{ steps.semantic.outputs.changelog }}
     steps:
