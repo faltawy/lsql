@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.5.2](https://github.com/faltawy/lsql/compare/v1.5.1...v1.5.2) (2025-03-10)
+
+### Bug Fixes
+
+* update publish workflow to handle Cargo.lock and add --allow-dirty flag ([badcc54](https://github.com/faltawy/lsql/commit/badcc5484b3ed2cf531ba3f6ba7418fc5102e625))
+
 ## [1.5.1](https://github.com/faltawy/lsql/compare/v1.5.0...v1.5.1) (2025-03-10)
 
 ### Bug Fixes
