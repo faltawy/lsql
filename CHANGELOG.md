@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.5.1](https://github.com/faltawy/lsql/compare/v1.5.0...v1.5.1) (2025-03-10)
+
+### Bug Fixes
+
+* update GitHub workflow to handle git synchronization issues ([945eb49](https://github.com/faltawy/lsql/commit/945eb49479cafc45ea4c7483647541a0d2442610))
+
 ## [1.5.0](https://github.com/faltawy/lsql/compare/v1.4.1...v1.5.0) (2025-03-10)
 
 ### Features
