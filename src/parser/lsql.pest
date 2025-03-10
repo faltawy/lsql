@@ -2,9 +2,9 @@
 // Whitespace and comments
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT = _{ "--" ~ (!"\n" ~ ANY)* ~ "\n"? }
-
+SEMICOLON = _{ ";" }
 // Main query structure
-query = { select_clause ~ from_clause ~ where_clause? ~ ";" }
+query = { select_clause ~ from_clause ~ where_clause? ~ SEMICOLON? ~ EOI? }
 
 // SELECT clause - what to select (files, directories, or both)
 select_clause = { "select" ~ selection }
@@ -22,7 +22,7 @@ field = {
 
 // FROM clause - where to search
 from_clause = { "from" ~ path }
-path = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" | (!(WHITESPACE | ";") ~ ANY)+ }
+path = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" | (!(WHITESPACE | ";" | "where") ~ ANY)+ }
 
 // WHERE clause - conditions for filtering
 where_clause = { "where" ~ condition }
