@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.9.0](https://github.com/faltawy/lsql/compare/v1.8.0...v1.9.0) (2025-03-10)
+
+### Features
+
+* Enhance 'type' field support in display and filtering ([b0deee3](https://github.com/faltawy/lsql/commit/b0deee37a986935068d98987d66fcaf443ccd29f))
+
 ## [1.8.0](https://github.com/faltawy/lsql/compare/v1.7.0...v1.8.0) (2025-03-10)
 
 ### Features
