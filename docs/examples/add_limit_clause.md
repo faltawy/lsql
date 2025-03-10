@@ -213,7 +213,7 @@ cargo build
 cargo run -- "select * from . limit 3;"
 
 # Test with a limit and a condition
-cargo run -- "select files from . where size > \"1mb\" limit 2;"
+cargo run -- "select type from . where size > \"1mb\" limit 2;"
 ```
 
 ## Conclusion
@@ -225,4 +225,4 @@ By following these steps, you've successfully added a new LIMIT clause to LSQL. 
 - `OFFSET` for pagination
 - Custom functions and operators
 
-Remember to follow the project's coding style and add proper documentation and tests for any new feature. 
+Remember to follow the project's coding style and add proper documentation and tests for any new feature.

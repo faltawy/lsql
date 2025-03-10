@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [Unreleased]
+
+### Breaking Changes
+
+* Replace file/directory selection options with a 'type' field for more SQL-like syntax ([commit-hash](https://github.com/faltawy/lsql/commit/))
+
 ## [1.7.0](https://github.com/faltawy/lsql/compare/v1.6.0...v1.7.0) (2025-03-10)
 
 ### Features

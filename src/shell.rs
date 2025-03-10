@@ -224,12 +224,12 @@ impl LSQLShell {
             nu_ansi_term::Color::Green.paint("SELECT * FROM .")
         );
         println!(
-            "  {} - List only files",
-            nu_ansi_term::Color::Green.paint("SELECT files FROM .")
+            "  {} - List file type information",
+            nu_ansi_term::Color::Green.paint("SELECT type FROM .")
         );
         println!(
-            "  {} - List only directories",
-            nu_ansi_term::Color::Green.paint("SELECT directories FROM .")
+            "  {} - List name and type information",
+            nu_ansi_term::Color::Green.paint("SELECT name, type FROM .")
         );
         println!(
             "  {} - List files with size > 1MB",

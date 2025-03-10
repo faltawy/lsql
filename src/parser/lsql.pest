@@ -31,15 +31,7 @@ recursive_flag = { RECURSIVE }
 limit_clause   = { LIMIT ~ number }
 selection      = {
     "*"
-  | // all items
-  "files"
-  | "f"
-  | // only files
-  "directories"
-  | "dirs"
-  | "d"
-  | // only directories
-  field_list // specific fields
+  | field_list // specific fields
 }
 field_list     = { field ~ ("," ~ field)* }
 field          = {
@@ -53,6 +45,7 @@ field          = {
   | "owner"
   | "is_hidden"
   | "is_readonly"
+  | "type"
 }
 
 // ORDER BY clause

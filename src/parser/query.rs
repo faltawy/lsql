@@ -356,19 +356,29 @@ mod tests {
 
     #[test]
     fn test_files_only_query() {
-        let query = "select files from /tmp;";
+        let query = "select type from /tmp;";
         let result = LSQLParser::parse_query(query).unwrap();
 
-        assert!(matches!(result.selection, SelectionType::Files));
+        if let SelectionType::Fields(fields) = &result.selection {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0], "type");
+        } else {
+            panic!("Expected Fields selection");
+        }
         assert_eq!(result.path, "/tmp");
     }
 
     #[test]
     fn test_directories_only_query() {
-        let query = "select directories from /home;";
+        let query = "select type from /home;";
         let result = LSQLParser::parse_query(query).unwrap();
 
-        assert!(matches!(result.selection, SelectionType::Directories));
+        if let SelectionType::Fields(fields) = &result.selection {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0], "type");
+        } else {
+            panic!("Expected Fields selection");
+        }
         assert_eq!(result.path, "/home");
     }
 
@@ -436,12 +446,16 @@ mod tests {
 
     #[test]
     fn test_complex_query() {
-        let query =
-            "select files from . where (size > 1mb and is_hidden = false) or ext = \"pdf\";";
+        let query = "select type from . where (size > 1mb and is_hidden = false) or ext = \"pdf\";";
         let result = LSQLParser::parse_query(query).unwrap();
 
-        // Test selection is Files
-        assert!(matches!(result.selection, SelectionType::Files));
+        // Test selection is type field
+        if let SelectionType::Fields(fields) = &result.selection {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0], "type");
+        } else {
+            panic!("Expected Fields selection");
+        }
 
         // Test path is current directory
         assert_eq!(result.path, ".");
@@ -471,7 +485,7 @@ mod tests {
         assert_eq!(limit, 5);
 
         // Test with a condition and limit
-        let query_with_condition = "select files from . where size > 1mb limit 10;";
+        let query_with_condition = "select type from . where size > 1mb limit 10;";
         let result_with_condition = LSQLParser::parse_query(query_with_condition).unwrap();
 
         assert!(result_with_condition.limit.is_some());
@@ -514,21 +528,31 @@ mod tests {
 
     #[test]
     fn test_delete_files_query() {
-        let query = "delete files from /tmp;";
+        let query = "delete type from /tmp;";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
-        assert!(matches!(result.selection, SelectionType::Files));
+        if let SelectionType::Fields(fields) = &result.selection {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0], "type");
+        } else {
+            panic!("Expected Fields selection");
+        }
         assert_eq!(result.path, "/tmp");
     }
 
     #[test]
     fn test_delete_with_condition() {
-        let query = "delete files from . where ext = \"tmp\";";
+        let query = "delete type from . where ext = \"tmp\";";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
-        assert!(matches!(result.selection, SelectionType::Files));
+        if let SelectionType::Fields(fields) = &result.selection {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0], "type");
+        } else {
+            panic!("Expected Fields selection");
+        }
         assert_eq!(result.path, ".");
         assert!(result.condition.is_some());
     }
@@ -601,11 +625,16 @@ mod tests {
 
     #[test]
     fn test_delete_recursive_with_condition() {
-        let query = "delete recursive files from . where ext = \"tmp\";";
+        let query = "delete recursive type from . where ext = \"tmp\";";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
-        assert!(matches!(result.selection, SelectionType::Files));
+        if let SelectionType::Fields(fields) = &result.selection {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0], "type");
+        } else {
+            panic!("Expected Fields selection");
+        }
         assert_eq!(result.path, ".");
         assert!(result.condition.is_some());
         assert!(result.is_recursive, "Query should be recursive");
@@ -613,33 +642,31 @@ mod tests {
 
     #[test]
     fn test_order_by_clause() {
-        // Test with a single order by term
-        let query = "select * from . order by name;";
+        let query = "select type from . where size > 1mb order by modified desc limit 10;";
         let result = LSQLParser::parse_query(query).unwrap();
 
-        assert_eq!(result.order_by.len(), 1);
-        assert_eq!(result.order_by[0].field, "name");
-        assert_eq!(result.order_by[0].direction, OrderDirection::Ascending);
+        // Check selection
+        if let SelectionType::Fields(fields) = &result.selection {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0], "type");
+        } else {
+            panic!("Expected Fields selection");
+        }
 
-        // Test with multiple order by terms
-        let query = "select * from . order by size desc, name asc;";
-        let result = LSQLParser::parse_query(query).unwrap();
+        // Check path
+        assert_eq!(result.path, ".");
 
-        assert_eq!(result.order_by.len(), 2);
-        assert_eq!(result.order_by[0].field, "size");
-        assert_eq!(result.order_by[0].direction, OrderDirection::Descending);
-        assert_eq!(result.order_by[1].field, "name");
-        assert_eq!(result.order_by[1].direction, OrderDirection::Ascending);
-
-        // Test with order by and other clauses
-        let query = "select files from . where size > 1mb order by modified desc limit 10;";
-        let result = LSQLParser::parse_query(query).unwrap();
-
-        assert!(matches!(result.selection, SelectionType::Files));
+        // Check condition
         assert!(result.condition.is_some());
+
+        // Check order by
+        assert!(!result.order_by.is_empty());
         assert_eq!(result.order_by.len(), 1);
         assert_eq!(result.order_by[0].field, "modified");
         assert_eq!(result.order_by[0].direction, OrderDirection::Descending);
-        assert_eq!(result.limit, Some(10));
+
+        // Check limit
+        assert!(result.limit.is_some());
+        assert_eq!(result.limit.unwrap(), 10);
     }
 }

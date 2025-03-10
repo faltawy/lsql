@@ -60,21 +60,16 @@ List all files and directories in the current directory:
 lsql "select * from .;"
 ```
 
-List only files:
+List files by selecting the type field:
 
 ```bash
-lsql "select files from .;"
-# or the short form
-lsql "select f from .;"
+lsql "select type from .;"
 ```
 
-List only directories:
+List specific fields including type:
 
 ```bash
-lsql "select directories from .;"
-# or the short forms
-lsql "select dirs from .;"
-lsql "select d from .;"
+lsql "select name, type, size from .;"
 ```
 
 ### Filtering with WHERE
@@ -115,7 +110,7 @@ In shell mode, you can type queries directly without wrapping them in quotes:
 
 ```
 lsql> select * from .;
-lsql> select files from /tmp where size > "1mb";
+lsql> select type from /tmp where size > "1mb";
 ```
 
 ### Options
@@ -135,7 +130,7 @@ You can adjust the verbosity of the log output using the `--log-level` option:
 lsql --log-level error "select * from .;"
 
 # Show detailed debug information
-lsql --log-level debug "select files from .;"
+lsql --log-level debug "select type from .;"
 
 # Maximum verbosity for troubleshooting
 lsql --log-level trace "select * from . where ext = \"jpg\";"
@@ -143,18 +138,16 @@ lsql --log-level trace "select * from . where ext = \"jpg\";"
 
 ## SQL-like Grammar
 
-- `SELECT` - What to display (files, directories, or both)
+- `SELECT` - What to display
   - `*`: All items
-  - `files`, `f`: Only files
-  - `directories`, `dirs`, `d`: Only directories
-  - Specific fields: e.g., `select name, size, ext from .;`
+  - Specific fields: e.g., `select name, size, ext, type from .;`
 
 - `FROM` - Where to search
   - Any valid path on your system
   - `.` for the current directory
 
 - `WHERE` - Conditions for filtering
-  - Properties: `name`, `path`, `size`, `ext`, `modified`, `created`, `is_hidden`, `is_dir`, `is_file`, `permissions`
+  - Properties: `name`, `path`, `size`, `ext`, `modified`, `created`, `is_hidden`, `type`, `permissions`
   - Operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `like`, `contains`
   - Size units: `b`, `kb`, `mb`, `gb`, `tb`
   - Logical operators: `and`, `or`
