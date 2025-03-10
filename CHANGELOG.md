@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.5.0](https://github.com/faltawy/lsql/compare/v1.4.1...v1.5.0) (2025-03-10)
+
+### Features
+
+* add support for cargo install and cargo binstall ([55ab9b4](https://github.com/faltawy/lsql/commit/55ab9b46de2ab0f33decfa397bc199e57e50e1c8))
+
 ## [1.4.1](https://github.com/faltawy/lsql/compare/v1.4.0...v1.4.1) (2025-03-10)
 
 ### Bug Fixes
