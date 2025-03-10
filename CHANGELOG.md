@@ -1,5 +1,13 @@
 # LSQL Changelog
 
+## [1.6.0](https://github.com/faltawy/lsql/compare/v1.5.2...v1.6.0) (2025-03-10)
+
+### Features
+
+* Add DELETE query support with dry run option ([c49002d](https://github.com/faltawy/lsql/commit/c49002da8bdf4facb876e42ff005ce6c71751f99))
+* Add LIMIT clause support to LSQL query parser and file listing ([6305a48](https://github.com/faltawy/lsql/commit/6305a48b49dbdb093e7f17104a214124e52e1f1f))
+* Enhance DELETE query with recursive deletion and user confirmation ([54dfb0c](https://github.com/faltawy/lsql/commit/54dfb0c483da338d23757b71f896b0ff003922a7))
+
 ## [1.5.2](https://github.com/faltawy/lsql/compare/v1.5.1...v1.5.2) (2025-03-10)
 
 ### Bug Fixes
