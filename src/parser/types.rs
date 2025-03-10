@@ -1,5 +1,4 @@
 // Types and enums for the SQL-like syntax
-use pest::Parser;
 use pest_derive::Parser;
 
 // Represents what should be selected (files, directories, or both)

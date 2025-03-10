@@ -1,7 +1,7 @@
 // Query parsing module
 use super::condition;
 use super::selection;
-use super::types::{ConditionNode, LSQLParser, Pair, Pairs, Rule, SelectionType};
+use super::types::{ConditionNode, LSQLParser, Pairs, Rule, SelectionType};
 use log::{debug, trace, warn};
 use pest::Parser;
 
@@ -102,7 +102,7 @@ fn parse_path(mut pairs: Pairs<Rule>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::{ComparisonOperator, LogicalOperator, Value};
+    use crate::parser::LogicalOperator;
 
     #[test]
     fn test_basic_query() {
