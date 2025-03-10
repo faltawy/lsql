@@ -109,7 +109,14 @@ impl LSQLParser {
                                     }
                                 }
 
-                                selection = selection::parse_selection(delete_part.into_inner());
+                                // Parse the delete selection
+                                let (sel, lim) = parse_delete_selection(delete_part.into_inner());
+                                selection = sel;
+
+                                // If a limit was specified in the delete selection, use it
+                                if lim.is_some() {
+                                    limit = lim;
+                                }
                             }
                             Rule::from_clause => {
                                 debug!("Found from_clause: {}", delete_part.as_str());
@@ -122,7 +129,10 @@ impl LSQLParser {
                             }
                             Rule::limit_clause => {
                                 debug!("Found limit_clause: {}", delete_part.as_str());
-                                limit = Some(parse_limit(delete_part.into_inner()));
+                                // Only set the limit if it wasn't already set in the delete selection
+                                if limit.is_none() {
+                                    limit = Some(parse_limit(delete_part.into_inner()));
+                                }
                             }
                             _ => {
                                 trace!(
@@ -175,56 +185,125 @@ impl LSQLParser {
 }
 
 /// Parse the path part of the query
-fn parse_path(mut pairs: Pairs<Rule>) -> String {
-    // Get the path pair
-    if let Some(path_pair) = pairs.next() {
-        let path_str = path_pair.as_str();
-        trace!("Path string: '{}'", path_str);
+fn parse_path(pairs: Pairs<Rule>) -> String {
+    // Extract the path from the pairs
+    for pair in pairs {
+        if pair.as_rule() == Rule::path {
+            let path_str = pair.as_str();
 
-        // Remove quotes if present
-        let result = if path_str.starts_with('"') && path_str.ends_with('"') {
-            path_str[1..path_str.len() - 1].to_string()
-        } else {
-            path_str.to_string()
-        };
-
-        debug!("Parsed path: '{}'", result);
-        result
-    } else {
-        // Default to current directory if no path specified
-        debug!("No path specified, defaulting to current directory '.'");
-        ".".to_string()
+            // Remove quotes if present
+            if path_str.starts_with('"') && path_str.ends_with('"') {
+                return path_str[1..path_str.len() - 1].to_string();
+            } else {
+                return path_str.to_string();
+            }
+        }
     }
+
+    // Default to current directory if no path found
+    ".".to_string()
 }
 
 /// Parse the limit part of the query
-fn parse_limit(mut pairs: Pairs<Rule>) -> u64 {
-    // Get the number pair
-    if let Some(number_pair) = pairs.next() {
-        let number_str = number_pair.as_str();
-        trace!("Limit number string: '{}'", number_str);
+fn parse_limit(pairs: Pairs<Rule>) -> u64 {
+    // Extract the number from the pairs
+    for pair in pairs {
+        if pair.as_rule() == Rule::number {
+            let number_str = pair.as_str();
 
-        // Parse the number, ignoring any size units
-        let number_only = number_str
-            .chars()
-            .take_while(|c| c.is_ascii_digit() || *c == '.')
-            .collect::<String>();
+            // Parse the number, ignoring any size units
+            let number_only = number_str
+                .chars()
+                .take_while(|c| c.is_ascii_digit() || *c == '.')
+                .collect::<String>();
 
-        match number_only.parse::<u64>() {
-            Ok(n) => {
-                debug!("Parsed limit: {}", n);
-                n
-            }
-            Err(_) => {
-                warn!("Invalid limit value: {}, defaulting to 100", number_str);
-                100 // Default to 100 if parsing fails
+            match number_only.parse::<u64>() {
+                Ok(n) => return n,
+                Err(_) => {
+                    warn!("Invalid limit value: {}, defaulting to 100", number_str);
+                    return 100; // Default to 100 if parsing fails
+                }
             }
         }
-    } else {
-        // Default to 100 if no limit specified
-        debug!("No limit specified, defaulting to 100");
-        100
     }
+
+    // Default to 100 if no number found
+    100
+}
+
+/// Parse the delete selection part of the query
+fn parse_delete_selection(pairs: Pairs<Rule>) -> (SelectionType, Option<u64>) {
+    let mut selection = SelectionType::All;
+    let mut limit = None;
+
+    debug!("Parsing delete selection");
+
+    for pair in pairs {
+        debug!("Delete selection pair rule: {:?}", pair.as_rule());
+        debug!("Delete selection pair text: {}", pair.as_str());
+
+        if pair.as_rule() == Rule::recursive_flag {
+            // Skip recursive flag, it's handled elsewhere
+            continue;
+        }
+
+        if pair.as_rule() == Rule::delete_selection {
+            let inner_pairs = pair.into_inner();
+            for inner_pair in inner_pairs {
+                debug!("Inner pair rule: {:?}", inner_pair.as_rule());
+                debug!("Inner pair text: {}", inner_pair.as_str());
+
+                match inner_pair.as_rule() {
+                    Rule::FIRST => {
+                        debug!("Found FIRST keyword");
+                        // If FIRST is specified, set limit to 1 by default
+                        limit = Some(1);
+                    }
+                    Rule::MANY => {
+                        debug!("Found MANY keyword");
+                        // If MANY is specified without a number, don't set a limit
+                        // The limit might be specified separately in a LIMIT clause
+                    }
+                    Rule::number => {
+                        debug!("Found number: {}", inner_pair.as_str());
+                        // If a number is specified after FIRST or MANY, use it as the limit
+                        let number_str = inner_pair.as_str();
+                        if let Ok(n) = number_str.parse::<u64>() {
+                            limit = Some(n);
+                        }
+                    }
+                    _ => {
+                        // For backward compatibility, handle * and field lists
+                        if inner_pair.as_str() == "*" {
+                            debug!("Found * selection");
+                            selection = SelectionType::All;
+                        } else {
+                            debug!("Found field list: {}", inner_pair.as_str());
+                            // This would be a field list
+                            let fields: Vec<String> = inner_pair
+                                .into_inner()
+                                .map(|p| p.as_str().to_string())
+                                .collect();
+                            selection = SelectionType::Fields(fields);
+                        }
+                    }
+                }
+            }
+        } else if pair.as_rule() == Rule::selection {
+            // For backward compatibility, handle the old selection syntax
+            debug!("Using old selection syntax");
+            selection = selection::parse_selection(Pairs::single(pair));
+        } else {
+            debug!("Unexpected rule in delete selection: {:?}", pair.as_rule());
+        }
+    }
+
+    debug!(
+        "Parsed delete selection: selection={:?}, limit={:?}",
+        selection, limit
+    );
+
+    (selection, limit)
 }
 
 /// Parse the order by clause
@@ -463,49 +542,44 @@ mod tests {
 
     #[test]
     fn test_delete_query() {
-        let query = "delete * from .;";
+        let query = "delete first from .;";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
         assert!(matches!(result.selection, SelectionType::All));
         assert_eq!(result.path, ".");
         assert!(result.condition.is_none());
+        assert!(result.limit.is_some());
+        assert_eq!(result.limit.unwrap(), 1);
     }
 
     #[test]
     fn test_delete_files_query() {
-        let query = "delete type from /tmp;";
+        let query = "delete many from /tmp;";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
-        if let SelectionType::Fields(fields) = &result.selection {
-            assert_eq!(fields.len(), 1);
-            assert_eq!(fields[0], "type");
-        } else {
-            panic!("Expected Fields selection");
-        }
+        assert!(matches!(result.selection, SelectionType::All));
         assert_eq!(result.path, "/tmp");
+        assert!(result.limit.is_none());
     }
 
     #[test]
     fn test_delete_with_condition() {
-        let query = "delete type from . where ext = \"tmp\";";
+        let query = "delete first from . where ext = \"tmp\";";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
-        if let SelectionType::Fields(fields) = &result.selection {
-            assert_eq!(fields.len(), 1);
-            assert_eq!(fields[0], "type");
-        } else {
-            panic!("Expected Fields selection");
-        }
+        assert!(matches!(result.selection, SelectionType::All));
         assert_eq!(result.path, ".");
         assert!(result.condition.is_some());
+        assert!(result.limit.is_some());
+        assert_eq!(result.limit.unwrap(), 1);
     }
 
     #[test]
     fn test_delete_with_limit() {
-        let query = "delete * from . limit 5;";
+        let query = "delete many 5 from .;";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
@@ -517,7 +591,7 @@ mod tests {
 
     #[test]
     fn test_delete_recursive() {
-        let query = "delete recursive * from .;";
+        let query = "delete recursive many from .;";
 
         // Debug: Print the parse tree
         match LSQLParser::parse(Rule::query, query) {
@@ -556,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_delete_with_shorthand_recursive() {
-        let query = "delete r * from .;";
+        let query = "delete r first from .;";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
@@ -567,23 +641,22 @@ mod tests {
             result.is_recursive,
             "Query should be recursive with shorthand 'r'"
         );
+        assert!(result.limit.is_some());
+        assert_eq!(result.limit.unwrap(), 1);
     }
 
     #[test]
     fn test_delete_recursive_with_condition() {
-        let query = "delete recursive type from . where ext = \"tmp\";";
+        let query = "delete recursive many 10 from . where ext = \"tmp\";";
         let result = LSQLParser::parse_query(query).unwrap();
 
         assert_eq!(result.query_type, QueryType::Delete);
-        if let SelectionType::Fields(fields) = &result.selection {
-            assert_eq!(fields.len(), 1);
-            assert_eq!(fields[0], "type");
-        } else {
-            panic!("Expected Fields selection");
-        }
+        assert!(matches!(result.selection, SelectionType::All));
         assert_eq!(result.path, ".");
         assert!(result.condition.is_some());
         assert!(result.is_recursive, "Query should be recursive");
+        assert!(result.limit.is_some());
+        assert_eq!(result.limit.unwrap(), 10);
     }
 
     #[test]

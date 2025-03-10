@@ -14,6 +14,8 @@ ORDER     = _{ "order" }
 BY        = _{ "by" }
 ASC       = _{ "asc" }
 DESC      = _{ "desc" }
+FIRST     =  { "first" }
+MANY      =  { "many" }
 
 // Main query structure
 query = { (select_query | delete_query) ~ SEMICOLON? ~ EOI? }
@@ -26,15 +28,27 @@ delete_query = { delete_clause ~ from_clause ~ where_clause? ~ limit_clause? }
 
 // SELECT clause - what to select (files, directories, or both)
 select_clause  = { SELECT ~ selection }
-delete_clause  = { DELETE ~ recursive_flag? ~ selection }
+delete_clause  = { DELETE ~ recursive_flag? ~ delete_selection }
 recursive_flag = { RECURSIVE }
 limit_clause   = { LIMIT ~ number }
-selection      = {
+
+// Selection for SELECT queries
+selection = {
     "*"
   | field_list // specific fields
 }
-field_list     = { field ~ ("," ~ field)* }
-field          = {
+
+// Selection for DELETE queries
+delete_selection = {
+    FIRST ~ number? // Delete first N matches (default 1)
+
+  | MANY ~ number? // Delete many matches (with optional limit)
+
+  | "*" // Keep * for backward compatibility
+}
+
+field_list = { field ~ ("," ~ field)* }
+field      = {
     "name"
   | "path"
   | "size"
