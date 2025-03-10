@@ -941,6 +941,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "reedline",
+ "regex",
  "rustyline",
  "rustyline-derive",
  "serde",

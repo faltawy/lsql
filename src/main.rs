@@ -3,6 +3,7 @@
 
 mod cli;
 mod display;
+mod filter;
 mod fs;
 mod parser;
 mod shell;

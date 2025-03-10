@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 use walkdir::{DirEntry, WalkDir};
 
-use crate::parser::{ComparisonOperator, ConditionNode, LogicalOperator, SelectionType, Value};
+use crate::parser::{ConditionNode, SelectionType};
 
 // Represents a file or directory entry with its attributes
 #[derive(Debug, Clone)]
@@ -48,40 +48,33 @@ impl FSEntry {
             }
         };
 
-        // Check if it's hidden (starts with .)
-        let is_hidden = name.starts_with('.');
-
         // Get file extension
         let extension = path
             .extension()
             .map(|ext| ext.to_string_lossy().to_string());
 
-        // Get timestamps
+        // Get file times
         let modified = match get_datetime_from_metadata(&metadata, MetadataTime::Modified) {
             Ok(time) => time,
             Err(e) => {
-                warn!("Failed to get modified time for {}: {}", path.display(), e);
-                return Err(e);
+                warn!("Failed to get modified time: {}", e);
+                Local::now() // Default to current time
             }
         };
 
         let created = match get_datetime_from_metadata(&metadata, MetadataTime::Created) {
             Ok(time) => time,
             Err(e) => {
-                warn!("Failed to get creation time for {}: {}", path.display(), e);
-                return Err(e);
+                warn!("Failed to get creation time: {}", e);
+                Local::now() // Default to current time
             }
         };
 
+        // Check if file is hidden (starts with . on Unix, or has hidden attribute on Windows)
+        let is_hidden = name.starts_with('.');
+
         // Get permissions
         let permissions = format_permissions(&metadata);
-
-        debug!(
-            "Created FSEntry for {}: is_dir={}, size={}",
-            name,
-            metadata.is_dir(),
-            metadata.len()
-        );
 
         Ok(FSEntry {
             name,
@@ -96,169 +89,15 @@ impl FSEntry {
             permissions,
         })
     }
-
-    // Check if the entry matches a condition
-    pub fn matches_condition(&self, condition: &Option<ConditionNode>) -> bool {
-        match condition {
-            None => true,
-            Some(node) => {
-                let result = self.evaluate_condition_node(node);
-                debug!("Condition evaluation for {}: {}", self.name, result);
-                result
-            }
-        }
-    }
-
-    // Evaluate a condition node against this entry
-    fn evaluate_condition_node(&self, node: &ConditionNode) -> bool {
-        match node {
-            ConditionNode::Leaf(condition) => self.evaluate_single_condition(
-                &condition.identifier,
-                &condition.operator,
-                &condition.value,
-            ),
-            ConditionNode::Branch {
-                left,
-                operator,
-                right,
-            } => {
-                let left_result = self.evaluate_condition_node(left);
-                let right_result = self.evaluate_condition_node(right);
-
-                match operator {
-                    LogicalOperator::And => left_result && right_result,
-                    LogicalOperator::Or => left_result || right_result,
-                }
-            }
-        }
-    }
-
-    // Evaluate a single condition against this entry
-    fn evaluate_single_condition(
-        &self,
-        identifier: &str,
-        operator: &ComparisonOperator,
-        value: &Value,
-    ) -> bool {
-        debug!(
-            "Evaluating condition: {} {:?} {:?}",
-            identifier, operator, value
-        );
-
-        match identifier {
-            "name" => self.compare_string_field(&self.name, operator, value),
-            "path" => self.compare_string_field(&self.path, operator, value),
-            "ext" => {
-                if let Some(ext) = &self.extension {
-                    self.compare_string_field(ext, operator, value)
-                } else {
-                    false
-                }
-            }
-            "size" => self.compare_size_field(self.size, operator, value),
-            "is_hidden" => {
-                if let Value::Bool(b) = value {
-                    match operator {
-                        ComparisonOperator::Equal => self.is_hidden == *b,
-                        ComparisonOperator::NotEqual => self.is_hidden != *b,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-            "is_dir" => {
-                if let Value::Bool(b) = value {
-                    match operator {
-                        ComparisonOperator::Equal => self.is_dir == *b,
-                        ComparisonOperator::NotEqual => self.is_dir != *b,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-            "is_file" => {
-                if let Value::Bool(b) = value {
-                    match operator {
-                        ComparisonOperator::Equal => self.is_file == *b,
-                        ComparisonOperator::NotEqual => self.is_file != *b,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-            "permissions" => self.compare_string_field(&self.permissions, operator, value),
-            // Timestamps would need more sophisticated comparison
-            _ => {
-                warn!("Unknown identifier in condition: {}", identifier);
-                false
-            }
-        }
-    }
-
-    // Compare a string field with a value
-    fn compare_string_field(
-        &self,
-        field: &str,
-        operator: &ComparisonOperator,
-        value: &Value,
-    ) -> bool {
-        if let Value::String(s) = value {
-            match operator {
-                ComparisonOperator::Equal => field == s,
-                ComparisonOperator::NotEqual => field != s,
-                ComparisonOperator::Like => field.contains(s),
-                ComparisonOperator::Contains => field.contains(s),
-                _ => false,
-            }
-        } else {
-            false
-        }
-    }
-
-    // Compare a size field with a value
-    fn compare_size_field(&self, size: u64, operator: &ComparisonOperator, value: &Value) -> bool {
-        match value {
-            Value::Number(n) => {
-                let size_f64 = size as f64;
-                match operator {
-                    ComparisonOperator::Equal => (size_f64 - n).abs() < f64::EPSILON,
-                    ComparisonOperator::NotEqual => (size_f64 - n).abs() >= f64::EPSILON,
-                    ComparisonOperator::LessThan => size_f64 < *n,
-                    ComparisonOperator::LessOrEqual => size_f64 <= *n,
-                    ComparisonOperator::GreaterThan => size_f64 > *n,
-                    ComparisonOperator::GreaterOrEqual => size_f64 >= *n,
-                    _ => false,
-                }
-            }
-            Value::SizedNumber(n, unit) => {
-                let bytes = convert_to_bytes(*n, unit);
-                let size_f64 = size as f64;
-
-                match operator {
-                    ComparisonOperator::Equal => (size_f64 - bytes).abs() < f64::EPSILON,
-                    ComparisonOperator::NotEqual => (size_f64 - bytes).abs() >= f64::EPSILON,
-                    ComparisonOperator::LessThan => size_f64 < bytes,
-                    ComparisonOperator::LessOrEqual => size_f64 <= bytes,
-                    ComparisonOperator::GreaterThan => size_f64 > bytes,
-                    ComparisonOperator::GreaterOrEqual => size_f64 >= bytes,
-                    _ => false,
-                }
-            }
-            _ => false,
-        }
-    }
 }
 
-// Enum to specify which timestamp to retrieve
+// Types of time metadata
 enum MetadataTime {
     Modified,
     Created,
 }
 
-// Convert system time to DateTime<Local>
+// Convert system time to DateTime
 fn get_datetime_from_metadata(
     metadata: &Metadata,
     time_type: MetadataTime,
@@ -272,176 +111,140 @@ fn get_datetime_from_metadata(
             .map_err(|e| format!("Failed to get creation time: {}", e))?,
     };
 
-    let duration = system_time
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| format!("Time error: {}", e))?;
+    let duration = match system_time.duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration,
+        Err(e) => {
+            return Err(format!(
+                "Time appears to be before Unix epoch: {}",
+                e.duration().as_secs()
+            ))
+        }
+    };
 
-    let secs = duration.as_secs();
-    let nsecs = duration.subsec_nanos();
+    let secs = duration.as_secs() as i64;
+    let nsecs = duration.subsec_nanos() as u32;
 
     // Convert to DateTime<Local>
-    let datetime = DateTime::from_timestamp(secs as i64, nsecs)
-        .ok_or_else(|| "Invalid timestamp".to_string())?
-        .into();
-
-    Ok(datetime)
+    match DateTime::from_timestamp(secs, nsecs) {
+        Some(dt) => Ok(DateTime::<Local>::from(dt)),
+        None => Ok(Local::now()),
+    }
 }
 
-// Format permissions as a simple string (read-only for now)
+// Format permissions in a simplified way
 fn format_permissions(metadata: &Metadata) -> String {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mode = metadata.permissions().mode();
-        format!("{:o}", mode & 0o777)
-    }
-
-    #[cfg(not(unix))]
-    {
-        if metadata.permissions().readonly() {
-            "readonly".to_string()
-        } else {
-            "readwrite".to_string()
-        }
+    let permissions = metadata.permissions();
+    if permissions.readonly() {
+        "readonly".to_string()
+    } else {
+        "readwrite".to_string()
     }
 }
 
-// Convert a sized number (e.g., 10mb) to bytes
-fn convert_to_bytes(num: f64, unit: &str) -> f64 {
-    match unit.to_lowercase().as_str() {
-        "kb" => num * 1024.0,
-        "mb" => num * 1024.0 * 1024.0,
-        "gb" => num * 1024.0 * 1024.0 * 1024.0,
-        "tb" => num * 1024.0 * 1024.0 * 1024.0 * 1024.0,
-        _ => num, // Assume bytes for any other unit
-    }
-}
-
-// List entries in a directory
+// List entries in a directory with optional filtering
 pub fn list_entries(
     path: &str,
     selection: &SelectionType,
     condition: &Option<ConditionNode>,
     recursive: bool,
 ) -> Result<Vec<FSEntry>, String> {
-    debug!("Listing entries in {} (recursive={})", path, recursive);
+    let path = normalize_path(path)?;
+    debug!("Listing entries in: {}", path.display());
 
-    let path = match normalize_path(path) {
-        Ok(p) => p,
-        Err(e) => {
-            warn!("Failed to normalize path {}: {}", path, e);
-            return Err(e);
-        }
+    let mut entries = Vec::new();
+    let walker = if recursive {
+        WalkDir::new(path).into_iter()
+    } else {
+        WalkDir::new(path).max_depth(1).into_iter()
     };
 
-    let mut walker = WalkDir::new(path);
+    for result in walker {
+        match result {
+            Ok(entry) => {
+                // Skip the root directory itself when non-recursive
+                if !recursive && entry.depth() == 0 {
+                    continue;
+                }
 
-    // Only go one level deep if not recursive
-    if !recursive {
-        walker = walker.max_depth(1);
-    }
+                match FSEntry::from_dir_entry(entry) {
+                    Ok(fs_entry) => {
+                        // Filter based on selection type
+                        let include = match selection {
+                            SelectionType::All => true,
+                            SelectionType::Files => fs_entry.is_file,
+                            SelectionType::Directories => fs_entry.is_dir,
+                            SelectionType::Fields(_) => true, // Fields selection doesn't affect filtering
+                        };
 
-    let mut entries = vec![];
-
-    for entry in walker.into_iter().filter_map(|e| e.ok()) {
-        if entry.path().is_dir() && entry.depth() == 0 {
-            // Skip the root directory itself
-            debug!("Skipping root directory itself");
-            continue;
-        }
-
-        match FSEntry::from_dir_entry(entry) {
-            Ok(fs_entry) => {
-                // Apply selection filter
-                let include = match selection {
-                    SelectionType::All => true,
-                    SelectionType::Files => fs_entry.is_file,
-                    SelectionType::Directories => fs_entry.is_dir,
-                    SelectionType::Fields(_) => true, // We'll handle field selection later
-                };
-
-                // Apply condition filter
-                if include && fs_entry.matches_condition(condition) {
-                    debug!("Adding entry to results: {}", fs_entry.name);
-                    entries.push(fs_entry);
+                        if include {
+                            // Add entry if it passes the selection filter
+                            entries.push(fs_entry);
+                        }
+                    }
+                    Err(e) => warn!("Error creating FSEntry: {}", e),
                 }
             }
-            Err(e) => {
-                warn!("Error processing entry: {}", e);
-            }
+            Err(e) => warn!("Error walking directory: {}", e),
         }
     }
 
-    debug!("Found {} entries after filtering", entries.len());
+    // Apply condition filtering using the filter module
+    let filtered_entries = crate::filter::filter_entries(entries, condition);
 
-    Ok(entries)
+    debug!("Found {} entries after filtering", filtered_entries.len());
+    Ok(filtered_entries)
 }
 
-// Normalize a path string
+// Normalize a path string to a PathBuf
 fn normalize_path(path_str: &str) -> Result<PathBuf, String> {
-    let path = if path_str == "." {
-        match std::env::current_dir() {
-            Ok(p) => p,
-            Err(e) => {
-                warn!("Failed to get current directory: {}", e);
-                return Err(format!("Failed to get current directory: {}", e));
-            }
-        }
-    } else {
-        PathBuf::from(path_str)
-    };
+    let path_str = path_str.trim();
 
-    if !path.exists() {
-        warn!("Path does not exist: {}", path.display());
-        return Err(format!("Path does not exist: {}", path.display()));
+    // Handle special case for current directory
+    if path_str == "." {
+        return Ok(std::env::current_dir()
+            .map_err(|e| format!("Failed to get current directory: {}", e))?);
     }
 
-    debug!("Normalized path: {}", path.display());
+    // Handle home directory expansion
+    if path_str.starts_with('~') {
+        if let Some(home) = dirs::home_dir() {
+            let home_str = home.to_string_lossy();
+            let expanded = path_str.replacen('~', &home_str, 1);
+            return Ok(PathBuf::from(expanded));
+        }
+    }
 
-    Ok(path)
+    Ok(PathBuf::from(path_str))
 }
 
-// A search context with configuration for how to search
+// Context for search operations
+#[derive(Debug, Clone)]
 pub struct SearchContext {
     pub recursive: bool,
 }
 
 impl SearchContext {
     pub fn new(recursive: bool) -> Self {
-        Self { recursive }
+        SearchContext { recursive }
     }
 }
 
-// Execute a query to get filtered filesystem entries
+// Execute a query and return matching entries
 pub fn execute_query(
     query: &crate::parser::Query,
     path: &str,
     context: &SearchContext,
 ) -> Result<Vec<FSEntry>, String> {
-    debug!("Executing query on path: {}", path);
+    let path_to_search = if query.path.is_empty() {
+        path
+    } else {
+        &query.path
+    };
 
-    // Get filesystem entries
-    let entries = list_entries(
-        &query.path,
+    list_entries(
+        path_to_search,
         &query.selection,
         &query.condition,
         context.recursive,
-    )?;
-
-    debug!("Found {} entries before filtering", entries.len());
-
-    // Filter entries based on selection type
-    let filtered_entries = entries
-        .into_iter()
-        .filter(|entry| match query.selection {
-            crate::parser::SelectionType::All => true,
-            crate::parser::SelectionType::Files => entry.is_file,
-            crate::parser::SelectionType::Directories => entry.is_dir,
-            crate::parser::SelectionType::Fields(_) => true,
-        })
-        .collect::<Vec<_>>();
-
-    debug!("Filtered to {} entries", filtered_entries.len());
-
-    Ok(filtered_entries)
+    )
 }
