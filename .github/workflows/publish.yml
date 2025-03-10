@@ -38,6 +38,16 @@ jobs:
           # This ensures the checkout action uses a token with sufficient permissions
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install conventionalcommits dependencies
+        run: |
+          npm install -g conventional-changelog-conventionalcommits
+          npm list -g conventional-changelog-conventionalcommits
+
       - name: Semantic Release
         id: semantic
         uses: cycjimmy/semantic-release-action@v4
