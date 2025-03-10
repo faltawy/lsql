@@ -1,6 +1,15 @@
 // Types and enums for the SQL-like syntax
 use pest_derive::Parser;
 
+// Represents the type of query (SELECT or DELETE)
+#[derive(Debug, Clone, PartialEq)]
+pub enum QueryType {
+    /// Select entries (read-only)
+    Select,
+    /// Delete entries
+    Delete,
+}
+
 // Represents what should be selected (files, directories, or both)
 #[derive(Debug, Clone)]
 pub enum SelectionType {

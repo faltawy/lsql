@@ -4,16 +4,25 @@ WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT    = _{ "--" ~ (!"\n" ~ ANY)* ~ "\n"? }
 SEMICOLON  = _{ ";" }
 // Keywords
-SELECT = _{ "select" }
-FROM   = _{ "from" }
-WHERE  = _{ "where" }
-LIMIT  = _{ "limit" }
+SELECT    = _{ "select" }
+FROM      = _{ "from" }
+WHERE     = _{ "where" }
+LIMIT     = _{ "limit" }
+DELETE    = _{ "delete" }
+RECURSIVE = _{ "recursive" | "r" }
 
 // Main query structure
-query = { select_clause ~ from_clause ~ where_clause? ~ limit_clause? ~ SEMICOLON? ~ EOI? }
+query = { (select_query | delete_query) ~ SEMICOLON? ~ EOI? }
+
+// SELECT query
+select_query = { select_clause ~ from_clause ~ where_clause? ~ limit_clause? }
+
+// DELETE query
+delete_query = { delete_clause ~ from_clause ~ where_clause? ~ limit_clause? }
 
 // SELECT clause - what to select (files, directories, or both)
 select_clause = { SELECT ~ selection }
+delete_clause = { DELETE ~ selection ~ RECURSIVE? }
 limit_clause  = { LIMIT ~ number }
 selection     = {
     "*"

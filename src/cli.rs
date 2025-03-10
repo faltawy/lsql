@@ -7,8 +7,8 @@ use log::{debug, info, warn};
 
 use crate::display;
 use crate::fs;
-use crate::parser::LSQLParser;
-use crate::theme::{Theme, ThemeManager};
+use crate::parser::{LSQLParser, QueryType};
+use crate::theme::{self, Theme, ThemeManager};
 
 // Define the log level enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -56,6 +56,10 @@ pub struct Args {
     /// Start interactive mode
     #[clap(long, short = 'i')]
     pub interactive: bool,
+
+    /// Perform a dry run for DELETE queries (show what would be deleted without actually deleting)
+    #[clap(long)]
+    pub dry_run: bool,
 
     /// Subcommands
     #[clap(subcommand)]
@@ -109,11 +113,17 @@ pub enum ThemeCommand {
     },
 }
 
-// Main CLI handler
+// CLI configuration
+#[derive(Debug, Clone)]
 pub struct CLI {
-    use_color: bool,
-    recursive: bool,
-    theme_manager: ThemeManager,
+    /// Whether to recursively search directories
+    pub recursive: bool,
+    /// Whether to use color in output
+    pub use_color: bool,
+    /// Theme manager for styling output
+    pub theme_manager: ThemeManager,
+    /// Whether to perform a dry run (for DELETE queries)
+    pub dry_run: bool,
 }
 
 impl CLI {
@@ -141,6 +151,7 @@ impl CLI {
             use_color,
             recursive: args.recursive,
             theme_manager,
+            dry_run: args.dry_run,
         }
     }
 
@@ -319,22 +330,53 @@ impl CLI {
         let path = query.path.clone();
         let search_context = fs::SearchContext::new(self.recursive);
 
-        // Execute query to get the results
-        let results = fs::execute_query(&query, &path, &search_context)?;
-        debug!("Found {} items matching query", results.len());
-
         // Get the current theme
         let theme = self.theme_manager.current_theme();
 
-        // Display results
-        display::display_results(&results, &query.selection, theme, self.use_color)?;
+        // Handle different query types
+        match query.query_type {
+            QueryType::Select => {
+                // Execute SELECT query to get the results
+                let results = fs::execute_query(&query, &path, &search_context)?;
+                debug!("Found {} items matching query", results.len());
 
-        // Print count
-        if !results.is_empty() {
-            info!("{} items found", results.len());
-            let count_message = format!("{} items found", results.len());
-            let message = display::format_message(&count_message, "success", theme, self.use_color);
-            println!("{}", message);
+                // Display results
+                display::display_results(&results, &query.selection, theme, self.use_color)?;
+            }
+            QueryType::Delete => {
+                // Execute DELETE query
+                let (failed_entries, deleted_count) =
+                    fs::execute_delete_query(&query, &path, &search_context, self.dry_run)?;
+
+                if self.dry_run {
+                    // In dry run mode, show what would be deleted
+                    println!("DRY RUN: The following entries would be deleted:");
+                    display::display_results(
+                        &failed_entries,
+                        &query.selection,
+                        theme,
+                        self.use_color,
+                    )?;
+                    println!("DRY RUN: {} entries would be deleted", failed_entries.len());
+                } else {
+                    // Show results of the delete operation
+                    if !failed_entries.is_empty() {
+                        println!("Failed to delete the following entries:");
+                        display::display_results(
+                            &failed_entries,
+                            &query.selection,
+                            theme,
+                            self.use_color,
+                        )?;
+                    }
+
+                    println!("Successfully deleted {} entries", deleted_count);
+
+                    if !failed_entries.is_empty() {
+                        println!("Failed to delete {} entries", failed_entries.len());
+                    }
+                }
+            }
         }
 
         Ok(())

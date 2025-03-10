@@ -259,6 +259,83 @@ pub fn execute_query(
     )
 }
 
+// Delete entries that match the criteria
+pub fn delete_entries(
+    path: &str,
+    selection: &SelectionType,
+    condition: &Option<ConditionNode>,
+    limit: Option<u64>,
+    recursive: bool,
+    dry_run: bool,
+) -> Result<(Vec<FSEntry>, usize), String> {
+    // First, list all entries that match the criteria
+    let entries_to_delete = list_entries(path, selection, condition, limit, recursive)?;
+
+    if entries_to_delete.is_empty() {
+        return Ok((Vec::new(), 0));
+    }
+
+    debug!("Found {} entries to delete", entries_to_delete.len());
+
+    // If this is a dry run, just return the entries that would be deleted
+    if dry_run {
+        return Ok((entries_to_delete, 0));
+    }
+
+    let mut deleted_count = 0;
+    let mut failed_entries = Vec::new();
+
+    // Delete each entry
+    for entry in &entries_to_delete {
+        let path = std::path::Path::new(&entry.path);
+
+        let result = if entry.is_dir {
+            debug!("Deleting directory: {}", entry.path);
+            std::fs::remove_dir_all(path)
+        } else {
+            debug!("Deleting file: {}", entry.path);
+            std::fs::remove_file(path)
+        };
+
+        match result {
+            Ok(_) => {
+                deleted_count += 1;
+            }
+            Err(e) => {
+                warn!("Failed to delete {}: {}", entry.path, e);
+                failed_entries.push(entry.clone());
+            }
+        }
+    }
+
+    debug!("Successfully deleted {} entries", deleted_count);
+
+    Ok((failed_entries, deleted_count))
+}
+
+// Execute a delete query and return the results
+pub fn execute_delete_query(
+    query: &crate::parser::Query,
+    path: &str,
+    context: &SearchContext,
+    dry_run: bool,
+) -> Result<(Vec<FSEntry>, usize), String> {
+    let path_to_search = if query.path.is_empty() {
+        path
+    } else {
+        &query.path
+    };
+
+    delete_entries(
+        path_to_search,
+        &query.selection,
+        &query.condition,
+        query.limit,
+        context.recursive,
+        dry_run,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397,5 +474,95 @@ mod tests {
                 "Entry should match the condition"
             );
         }
+    }
+
+    #[test]
+    fn test_delete_entries_dry_run() {
+        let temp_dir = setup_test_directory();
+        let dir_path = temp_dir.path().to_string_lossy().to_string();
+
+        // Test with dry run mode (should not delete anything)
+        let (entries_to_delete, deleted_count) = delete_entries(
+            &dir_path,
+            &SelectionType::Files,
+            &None,
+            Some(3),
+            false,
+            true, // dry run
+        )
+        .unwrap();
+
+        // Should return entries that would be deleted
+        assert_eq!(
+            entries_to_delete.len(),
+            3,
+            "Should return 3 entries that would be deleted"
+        );
+
+        // Should not delete anything
+        assert_eq!(
+            deleted_count, 0,
+            "Should not delete any entries in dry run mode"
+        );
+
+        // Verify files still exist
+        let all_entries = list_entries(&dir_path, &SelectionType::All, &None, None, false).unwrap();
+
+        assert!(
+            all_entries.len() > 3,
+            "Files should still exist after dry run"
+        );
+    }
+
+    #[test]
+    fn test_delete_entries_with_condition() {
+        let temp_dir = setup_test_directory();
+        let dir_path = temp_dir.path().to_string_lossy().to_string();
+
+        // Create a condition to match specific files
+        let condition = Some(ConditionNode::Leaf(Condition {
+            identifier: "name".to_string(),
+            operator: ComparisonOperator::Contains,
+            value: Value::String("test_file_1".to_string()), // Only match test_file_1.txt
+        }));
+
+        // Count files before deletion
+        let before_entries =
+            list_entries(&dir_path, &SelectionType::Files, &None, None, false).unwrap();
+
+        let before_count = before_entries.len();
+
+        // Delete entries matching the condition
+        let (failed_entries, deleted_count) = delete_entries(
+            &dir_path,
+            &SelectionType::Files,
+            &condition,
+            None,
+            false,
+            false, // actual deletion
+        )
+        .unwrap();
+
+        // Should have deleted 1 file
+        assert_eq!(deleted_count, 1, "Should delete 1 file");
+        assert_eq!(
+            failed_entries.len(),
+            0,
+            "Should not have any failed deletions"
+        );
+
+        // Verify file was deleted
+        let after_entries =
+            list_entries(&dir_path, &SelectionType::Files, &None, None, false).unwrap();
+
+        assert_eq!(
+            after_entries.len(),
+            before_count - 1,
+            "One file should be deleted"
+        );
+
+        // Verify the specific file was deleted
+        let has_test_file_1 = after_entries.iter().any(|e| e.name.contains("test_file_1"));
+        assert!(!has_test_file_1, "test_file_1.txt should be deleted");
     }
 }

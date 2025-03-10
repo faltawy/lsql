@@ -1,13 +1,15 @@
 // Query parsing module
 use super::condition;
 use super::selection;
-use super::types::{ConditionNode, LSQLParser, Pairs, Rule, SelectionType};
+use super::types::{ConditionNode, LSQLParser, Pairs, QueryType, Rule, SelectionType};
 use log::{debug, trace, warn};
 use pest::Parser;
 
 /// Represents a parsed query
 #[derive(Debug, Clone)]
 pub struct Query {
+    /// Type of query (SELECT or DELETE)
+    pub query_type: QueryType,
     /// What to select (files, directories, or specific fields)
     pub selection: SelectionType,
     /// Path to search in
@@ -32,6 +34,7 @@ impl LSQLParser {
             }
         };
 
+        let mut query_type = QueryType::Select; // Default to SELECT
         let mut selection = SelectionType::All;
         let mut path = String::new();
         let mut condition = None;
@@ -42,30 +45,81 @@ impl LSQLParser {
             trace!("Processing rule: {:?}", pair.as_rule());
 
             match pair.as_rule() {
-                Rule::select_clause => {
-                    debug!("Found select_clause: {}", pair.as_str());
-                    selection = selection::parse_selection(pair.into_inner());
+                Rule::select_query => {
+                    debug!("Found select_query");
+                    query_type = QueryType::Select;
+
+                    // Process the select query parts
+                    for select_part in pair.into_inner() {
+                        match select_part.as_rule() {
+                            Rule::select_clause => {
+                                debug!("Found select_clause: {}", select_part.as_str());
+                                selection = selection::parse_selection(select_part.into_inner());
+                            }
+                            Rule::from_clause => {
+                                debug!("Found from_clause: {}", select_part.as_str());
+                                path = parse_path(select_part.into_inner());
+                            }
+                            Rule::where_clause => {
+                                debug!("Found where_clause: {}", select_part.as_str());
+                                condition =
+                                    Some(condition::parse_condition(select_part.into_inner()));
+                            }
+                            Rule::limit_clause => {
+                                debug!("Found limit_clause: {}", select_part.as_str());
+                                limit = Some(parse_limit(select_part.into_inner()));
+                            }
+                            _ => {
+                                trace!(
+                                    "Found unknown rule in select_query: {}",
+                                    select_part.as_str()
+                                );
+                            }
+                        }
+                    }
                 }
-                Rule::from_clause => {
-                    debug!("Found from_clause: {}", pair.as_str());
-                    path = parse_path(pair.into_inner());
-                }
-                Rule::where_clause => {
-                    debug!("Found where_clause: {}", pair.as_str());
-                    condition = Some(condition::parse_condition(pair.into_inner()));
-                }
-                Rule::limit_clause => {
-                    debug!("Found limit_clause: {}", pair.as_str());
-                    limit = Some(parse_limit(pair.into_inner()));
+                Rule::delete_query => {
+                    debug!("Found delete_query");
+                    query_type = QueryType::Delete;
+
+                    // Process the delete query parts
+                    for delete_part in pair.into_inner() {
+                        match delete_part.as_rule() {
+                            Rule::delete_clause => {
+                                debug!("Found delete_clause: {}", delete_part.as_str());
+                                selection = selection::parse_selection(delete_part.into_inner());
+                            }
+                            Rule::from_clause => {
+                                debug!("Found from_clause: {}", delete_part.as_str());
+                                path = parse_path(delete_part.into_inner());
+                            }
+                            Rule::where_clause => {
+                                debug!("Found where_clause: {}", delete_part.as_str());
+                                condition =
+                                    Some(condition::parse_condition(delete_part.into_inner()));
+                            }
+                            Rule::limit_clause => {
+                                debug!("Found limit_clause: {}", delete_part.as_str());
+                                limit = Some(parse_limit(delete_part.into_inner()));
+                            }
+                            _ => {
+                                trace!(
+                                    "Found unknown rule in delete_query: {}",
+                                    delete_part.as_str()
+                                );
+                            }
+                        }
+                    }
                 }
                 _ => {
-                    trace!("Found unknown rule: {}", pair.as_str());
+                    trace!("Found unknown rule at top level: {}", pair.as_str());
                 }
             }
         }
 
         debug!(
-            "Parsed query: selection={:?}, path={}, condition={}, limit={}",
+            "Parsed query: type={:?}, selection={:?}, path={}, condition={}, limit={}",
+            query_type,
             selection,
             path,
             if condition.is_some() {
@@ -81,6 +135,7 @@ impl LSQLParser {
         );
 
         Ok(Query {
+            query_type,
             selection,
             path,
             condition,
@@ -296,5 +351,49 @@ mod tests {
         let result_no_limit = LSQLParser::parse_query(query_no_limit).unwrap();
 
         assert!(result_no_limit.limit.is_none());
+    }
+
+    #[test]
+    fn test_delete_query() {
+        let query = "delete * from .;";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.query_type, QueryType::Delete);
+        assert!(matches!(result.selection, SelectionType::All));
+        assert_eq!(result.path, ".");
+        assert!(result.condition.is_none());
+    }
+
+    #[test]
+    fn test_delete_files_query() {
+        let query = "delete files from /tmp;";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.query_type, QueryType::Delete);
+        assert!(matches!(result.selection, SelectionType::Files));
+        assert_eq!(result.path, "/tmp");
+    }
+
+    #[test]
+    fn test_delete_with_condition() {
+        let query = "delete files from . where ext = \"tmp\";";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.query_type, QueryType::Delete);
+        assert!(matches!(result.selection, SelectionType::Files));
+        assert_eq!(result.path, ".");
+        assert!(result.condition.is_some());
+    }
+
+    #[test]
+    fn test_delete_with_limit() {
+        let query = "delete * from . limit 5;";
+        let result = LSQLParser::parse_query(query).unwrap();
+
+        assert_eq!(result.query_type, QueryType::Delete);
+        assert!(matches!(result.selection, SelectionType::All));
+        assert_eq!(result.path, ".");
+        assert!(result.limit.is_some());
+        assert_eq!(result.limit.unwrap(), 5);
     }
 }
