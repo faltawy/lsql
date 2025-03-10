@@ -40,8 +40,7 @@ jobs:
 
       - name: Install conventionalcommits dependencies
         run: |
-          npm install -g conventional-changelog-conventionalcommits
-          npm list -g conventional-changelog-conventionalcommits
+          npm install -g @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/changelog @semantic-release/git @semantic-release/github
 
       - name: Semantic Release
         id: semantic
@@ -52,10 +51,7 @@ jobs:
             [
               'master'
             ]
-          extra_plugins: |
-            @semantic-release/changelog
-            @semantic-release/git
-            conventional-changelog-conventionalcommits
+        
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
