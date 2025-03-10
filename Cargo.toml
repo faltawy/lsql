@@ -1,6 +1,6 @@
 [package]
 name = "lsql"
-version = "0.0.1"
+version = "1.5.1"
 edition = "2021"
 exclude = [".github/**", "docs/**", "media/**", "scripts/**"]
 readme = "README.md"
