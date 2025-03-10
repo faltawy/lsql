@@ -44,7 +44,7 @@ pub struct Args {
     recursive: bool,
 
     /// Set the logging level
-    #[clap(long, short = 'l', value_enum, default_value = "info")]
+    #[clap(long, short = 'l', value_enum, default_value = "off")]
     log_level: LogLevel,
 
     /// Select the color theme
