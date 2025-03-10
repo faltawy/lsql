@@ -40,6 +40,48 @@ pub fn parse_value(pair: Pair<Rule>) -> Value {
             trace!("Parsed boolean value: {:?}", value);
             value
         }
+        Rule::value => {
+            // For atomic rules, we need to check the content directly
+            let s = pair.as_str();
+
+            // Check if it's a string (surrounded by quotes)
+            if s.starts_with('"') && s.ends_with('"') {
+                let value = Value::String(s[1..s.len() - 1].to_string());
+                trace!("Parsed string value from atomic rule: {:?}", value);
+                return value;
+            }
+
+            // Check if it's a boolean
+            if s == "true" || s == "false" {
+                let value = Value::Bool(s == "true");
+                trace!("Parsed boolean value from atomic rule: {:?}", value);
+                return value;
+            }
+
+            // Check if it's a number with a unit
+            if let Some(unit_start) = s.find(|c: char| !c.is_ascii_digit() && c != '.') {
+                let (num_str, unit) = s.split_at(unit_start);
+                if let Ok(num) = num_str.parse::<f64>() {
+                    let value = Value::SizedNumber(num, unit.to_string());
+                    trace!("Parsed sized number value from atomic rule: {:?}", value);
+                    return value;
+                }
+            }
+
+            // Check if it's a plain number
+            if let Ok(num) = s.parse::<f64>() {
+                let value = Value::Number(num);
+                trace!("Parsed number value from atomic rule: {:?}", value);
+                return value;
+            }
+
+            // Default to string if we can't determine the type
+            warn!(
+                "Could not determine value type for '{}', defaulting to empty string",
+                s
+            );
+            Value::String("".to_string())
+        }
         _ => {
             warn!(
                 "Unknown value type: {:?}, using empty string",

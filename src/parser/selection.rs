@@ -6,32 +6,58 @@ use log::{debug, trace};
 pub fn parse_selection(mut pairs: Pairs<Rule>) -> SelectionType {
     // Get the selection pair
     if let Some(selection_pair) = pairs.next() {
-        let selection_str = selection_pair.as_str();
-        trace!("Selection string: '{}'", selection_str);
+        trace!("Selection rule: {:?}", selection_pair.as_rule());
+        trace!("Selection string: '{}'", selection_pair.as_str());
 
-        // Check for direct matches in the selection string
-        if selection_str.contains("files") || selection_str.contains("f") {
-            debug!("Matched 'files' selection");
-            return SelectionType::Files;
-        } else if selection_str.contains("directories")
-            || selection_str.contains("dirs")
-            || selection_str.contains("d")
-        {
-            debug!("Matched 'directories' selection");
-            return SelectionType::Directories;
-        } else if selection_str.contains("*") {
-            debug!("Matched '*' selection");
-            return SelectionType::All;
-        }
+        match selection_pair.as_rule() {
+            Rule::selection => {
+                let selection_str = selection_pair.as_str();
 
-        // Try to parse as field list
-        let inner_pairs = selection_pair.into_inner();
-        for inner in inner_pairs {
-            if inner.as_rule() == Rule::field_list {
-                let fields: Vec<String> =
-                    inner.into_inner().map(|p| p.as_str().to_string()).collect();
-                debug!("Parsed field list: {:?}", fields);
-                return SelectionType::Fields(fields);
+                // Check the selection string directly
+                match selection_str {
+                    "*" => {
+                        debug!("Matched '*' selection");
+                        return SelectionType::All;
+                    }
+                    "files" => {
+                        debug!("Matched 'files' selection");
+                        return SelectionType::Files;
+                    }
+                    "f" => {
+                        debug!("Matched 'f' selection (shorthand for files)");
+                        return SelectionType::Files;
+                    }
+                    "directories" => {
+                        debug!("Matched 'directories' selection");
+                        return SelectionType::Directories;
+                    }
+                    "dirs" => {
+                        debug!("Matched 'dirs' selection (shorthand for directories)");
+                        return SelectionType::Directories;
+                    }
+                    "d" => {
+                        debug!("Matched 'd' selection (shorthand for directories)");
+                        return SelectionType::Directories;
+                    }
+                    _ => {
+                        // Check for field list
+                        let inner_pairs = selection_pair.into_inner();
+                        for inner in inner_pairs {
+                            if inner.as_rule() == Rule::field_list {
+                                let fields: Vec<String> =
+                                    inner.into_inner().map(|p| p.as_str().to_string()).collect();
+                                debug!("Parsed field list: {:?}", fields);
+                                return SelectionType::Fields(fields);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                debug!(
+                    "Unexpected rule in selection: {:?}",
+                    selection_pair.as_rule()
+                );
             }
         }
     }
