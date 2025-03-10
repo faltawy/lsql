@@ -6,6 +6,12 @@ exclude = [".github/**", "docs/**", "media/**", "scripts/**"]
 readme = "README.md"
 authors = ["faltawy"]
 description = "A command-line utility that queries files and directories using SQL-like syntax"
+license = "MIT"
+repository = "https://github.com/faltawy/lsql"
+homepage = "https://github.com/faltawy/lsql"
+documentation = "https://github.com/faltawy/lsql#readme"
+keywords = ["cli", "sql", "filesystem", "query", "search"]
+categories = ["command-line-utilities", "filesystem"]
 
 [profile.release]
 opt-level = 3
@@ -33,3 +39,7 @@ nu-plugin = "0.102.0"
 syntect = "5.1.0"
 miette = { version = "7.5.0", features = ["fancy"] }
 regex = "1.10.3"
+
+[[bin]]
+name = "lsql"
+path = "src/main.rs"

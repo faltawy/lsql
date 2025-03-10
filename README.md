@@ -13,18 +13,42 @@ LSQL is a command-line utility that queries files and directories using SQL-like
 
 ## Installation
 
+### Using Cargo
+
+The easiest way to install LSQL is via Cargo, Rust's package manager:
+
+```bash
+cargo install lsql
+```
+
+### Using Cargo-Binstall
+
+For faster installation without compilation, you can use [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
+
+```bash
+# Install cargo-binstall if you don't have it
+cargo install cargo-binstall
+
+# Install LSQL
+cargo binstall lsql
+```
+
 ### From Source
 
 To build from source, you'll need a Rust environment. If you don't have it yet, install it from [rustup.rs](https://rustup.rs/).
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/lsql.git
+git clone https://github.com/faltawy/lsql.git
 cd lsql
 
 # Build and install
 cargo install --path .
 ```
+
+### Pre-built Binaries
+
+You can also download pre-built binaries from the [GitHub Releases page](https://github.com/faltawy/lsql/releases).
 
 ## Usage
 
