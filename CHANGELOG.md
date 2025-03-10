@@ -1,5 +1,11 @@
 # LSQL Changelog
 
+## [1.10.0](https://github.com/faltawy/lsql/compare/v1.9.0...v1.10.0) (2025-03-10)
+
+### Features
+
+* Enhance delete query syntax with FIRST and MANY keywords ([f89914e](https://github.com/faltawy/lsql/commit/f89914e112e4b7e8aa0f1c98f48ea5c8bea3331e))
+
 ## [1.9.0](https://github.com/faltawy/lsql/compare/v1.8.0...v1.9.0) (2025-03-10)
 
 ### Features
