@@ -93,12 +93,24 @@ jobs:
     - name: Run tests
       run: cargo test --target ${{ matrix.target.rust }} --release
 
+    - name: List artifacts (Debug)
+      run: |
+        ls -la target/${{ matrix.target.rust }}/release/
+      if: matrix.os == 'ubuntu-latest'
+      
+    - name: List artifacts (Debug - Windows)
+      run: |
+        dir target\${{ matrix.target.rust }}\release\
+      if: matrix.os == 'windows-2019'
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.target.rust }}-binaries
         path: |
-          target/${{ matrix.target.rust }}/release/lsql*
+          target/${{ matrix.target.rust }}/release/lsql
+          target/${{ matrix.target.rust }}/release/lsql.exe
+        if-no-files-found: warn
 
   release:
     needs: [build-and-test, semantic-versioning]
@@ -115,6 +127,10 @@ jobs:
       with:
         path: artifacts/
 
+    - name: List downloaded artifacts (Debug)
+      run: |
+        find artifacts -type f | sort
+
     - name: Create GitHub Release
       id: create_release
       uses: softprops/action-gh-release@v1
@@ -122,8 +138,7 @@ jobs:
         tag_name: v${{ needs.semantic-versioning.outputs.new_version }}
         name: Release v${{ needs.semantic-versioning.outputs.new_version }}
         body: ${{ needs.semantic-versioning.outputs.changelog }}
-        files: |
-          artifacts/**/*
+        files: artifacts/**/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
