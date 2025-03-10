@@ -1,8 +1,9 @@
 use crate::cli::CLI;
-use log::info;
+use log::{error, info, warn};
 use nu_ansi_term::{Color, Style};
 use reedline::{DefaultPrompt, Prompt, PromptEditMode, PromptHistorySearch, Reedline, Signal};
 use std::borrow::Cow;
+use std::io::{self, Write};
 
 // Custom LSQL prompt
 struct LSQLPrompt {
@@ -54,22 +55,34 @@ impl Prompt for LSQLPrompt {
 // The LSQL Shell
 pub struct LSQLShell {
     reedline: Reedline,
-    history_file: Option<String>,
+}
+
+enum ShellError {
+    ExecutionError(String),
+    UnknownCommand(String),
+    IoError(io::Error),
+    InternalError(String),
+}
+
+impl From<io::Error> for ShellError {
+    fn from(err: io::Error) -> Self {
+        ShellError::IoError(err)
+    }
+}
+
+impl From<String> for ShellError {
+    fn from(err: String) -> Self {
+        ShellError::ExecutionError(err)
+    }
 }
 
 impl LSQLShell {
     pub fn new() -> Self {
-        // Set up history
-        let history_file = dirs::home_dir()
-            .map(|dir| dir.join(".lsql_history"))
-            .map(|path| path.to_string_lossy().to_string());
-
         // Configure a simple line editor without highlighting or completion
         let line_editor = Reedline::create();
 
         Self {
             reedline: line_editor,
-            history_file,
         }
     }
 
@@ -95,55 +108,95 @@ impl LSQLShell {
         );
         println!();
         println!(
-            "Type {} to see available commands",
-            nu_ansi_term::Color::Cyan.paint("help")
+            "{} Type {} to see available commands",
+            Color::Cyan.bold().paint("•"),
+            Color::Cyan.paint("help")
         );
-        println!("Type {} to exit", nu_ansi_term::Color::Red.paint("exit"));
+        println!(
+            "{} Type {} to exit",
+            Color::Cyan.bold().paint("•"),
+            Color::Red.paint("exit")
+        );
         println!();
     }
 
-    fn process_command(&self, line: &str, cli: &CLI) -> bool {
+    fn process_command(&self, line: &str, cli: &CLI) -> Result<bool, ShellError> {
         let command = line.trim().to_lowercase();
+
+        // Empty command - just ignore
+        if command.is_empty() {
+            return Ok(true);
+        }
 
         match command.as_str() {
             "exit" | "quit" => {
                 println!("Goodbye!");
-                return false;
+                return Ok(false);
             }
             "help" => {
                 self.print_help();
             }
             "clear" => {
                 print!("\x1B[2J\x1B[1;1H"); // ANSI escape code to clear screen
+                io::stdout().flush()?;
             }
             _ => {
                 // Handle SQL query
                 if command.starts_with("select") {
-                    // Use the CLI's execute_query method
-                    if let Err(e) = cli.execute_query(&command) {
-                        println!("{}: {}", nu_ansi_term::Color::Red.bold().paint("Error"), e);
+                    match cli.execute_query(&command) {
+                        Ok(_) => (),
+                        Err(e) => return Err(ShellError::ExecutionError(e)),
                     }
-                } else if !command.is_empty() {
-                    println!(
-                        "{}: Unknown command '{}'",
-                        nu_ansi_term::Color::Red.bold().paint("Error"),
-                        command
-                    );
-                    println!(
-                        "Type {} to see available commands",
-                        nu_ansi_term::Color::Cyan.paint("help")
-                    );
+                } else {
+                    return Err(ShellError::UnknownCommand(command));
                 }
             }
         }
 
-        true
+        Ok(true)
+    }
+
+    fn display_error(&self, error: ShellError) {
+        match error {
+            ShellError::ExecutionError(msg) => {
+                eprintln!("{} {}", Color::Red.bold().paint("Error:"), msg);
+                error!("Query execution error: {}", msg);
+            }
+            ShellError::UnknownCommand(cmd) => {
+                eprintln!(
+                    "{} Unknown command '{}'",
+                    Color::Red.bold().paint("Error:"),
+                    cmd
+                );
+                eprintln!(
+                    "    {} Type {} to see available commands",
+                    Color::Cyan.bold().paint("•"),
+                    Color::Cyan.paint("help")
+                );
+                warn!("Unknown command attempted: {}", cmd);
+            }
+            ShellError::IoError(err) => {
+                eprintln!("{} I/O error: {}", Color::Red.bold().paint("Error:"), err);
+                error!("I/O error: {}", err);
+            }
+            ShellError::InternalError(msg) => {
+                eprintln!(
+                    "{} Internal error: {}",
+                    Color::Red.bold().paint("Error:"),
+                    msg
+                );
+                error!("Internal error: {}", msg);
+            }
+        }
     }
 
     fn print_help(&self) {
         println!(
-            "{}:",
-            nu_ansi_term::Color::Yellow.bold().paint("LSQL Commands")
+            "{}",
+            nu_ansi_term::Color::Yellow
+                .bold()
+                .underline()
+                .paint("LSQL Commands")
         );
         println!(
             "  {} - Show this help message",
@@ -160,8 +213,11 @@ impl LSQLShell {
         println!();
 
         println!(
-            "{}:",
-            nu_ansi_term::Color::Yellow.bold().paint("Query Examples")
+            "{}",
+            nu_ansi_term::Color::Yellow
+                .bold()
+                .underline()
+                .paint("Query Examples")
         );
         println!(
             "  {} - List all files and directories",
@@ -186,8 +242,11 @@ impl LSQLShell {
         println!();
 
         println!(
-            "{}:",
-            nu_ansi_term::Color::Yellow.bold().paint("Available Fields")
+            "{}",
+            nu_ansi_term::Color::Yellow
+                .bold()
+                .underline()
+                .paint("Available Fields")
         );
         println!(
             "  {} - Name of file or directory",
@@ -232,26 +291,38 @@ impl LSQLShell {
         let prompt = Box::new(LSQLPrompt::new());
 
         loop {
-            let sig = self.reedline.read_line(prompt.as_ref());
-            match sig {
+            match self.reedline.read_line(prompt.as_ref()) {
                 Ok(Signal::Success(line)) => {
                     // Process the command
-                    if !self.process_command(&line, cli) {
-                        break;
+                    match self.process_command(&line, cli) {
+                        Ok(continue_loop) => {
+                            if !continue_loop {
+                                break;
+                            }
+                        }
+                        Err(err) => {
+                            self.display_error(err);
+                        }
                     }
                 }
                 Ok(Signal::CtrlC) => {
-                    println!("Ctrl-C received, press Ctrl-D or type 'exit' to exit");
+                    println!(
+                        "{} Press Ctrl+D or type 'exit' to exit",
+                        Color::Yellow.bold().paint("Interrupted!")
+                    );
                 }
                 Ok(Signal::CtrlD) => {
                     println!("Goodbye!");
                     break;
                 }
                 Err(err) => {
-                    eprintln!("Error: {}", err);
+                    eprintln!("{} {}", Color::Red.bold().paint("Terminal error:"), err);
+                    error!("Terminal error: {}", err);
                     break;
                 }
             }
         }
+
+        info!("LSQL interactive shell exited");
     }
 }
