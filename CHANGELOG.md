@@ -1,5 +1,15 @@
 # LSQL Changelog
 
+## [1.7.0](https://github.com/faltawy/lsql/compare/v1.6.0...v1.7.0) (2025-03-10)
+
+### Features
+
+* Add ORDER BY support for sorting file system entries ([82ccc40](https://github.com/faltawy/lsql/commit/82ccc408e3b33bdf7fd530082fddb2f240fd5bac))
+
+### Code Refactoring
+
+* Remove unused imports in cli module ([f77463f](https://github.com/faltawy/lsql/commit/f77463f536b8f4f29dc7b5415f1f8317861dcb2c))
+
 ## [1.6.0](https://github.com/faltawy/lsql/compare/v1.5.2...v1.6.0) (2025-03-10)
 
 ### Features
