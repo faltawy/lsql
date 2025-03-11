@@ -1,5 +1,16 @@
 # LSQL Changelog
 
+## [1.11.0](https://github.com/faltawy/lsql/compare/v1.10.0...v1.11.0) (2025-03-11)
+
+### Features
+
+* Enhance shell experience with Emacs keybindings and validator ([632f3ba](https://github.com/faltawy/lsql/commit/632f3bafcc8b890e58031e6850eb3d11c3547f8d))
+
+### Code Refactoring
+
+* Improve non-recursive directory deletion handling ([469d637](https://github.com/faltawy/lsql/commit/469d637ef1efb8a68fadc7efbd46fe5223058980))
+* Remove Files and Directories selection types ([27644c9](https://github.com/faltawy/lsql/commit/27644c904cdf41198bad9a7c42bea399858c6223))
+
 ## [1.10.0](https://github.com/faltawy/lsql/compare/v1.9.0...v1.10.0) (2025-03-10)
 
 ### Features
