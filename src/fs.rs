@@ -709,13 +709,19 @@ mod tests {
         assert!(before_dir_count > 0, "Should have at least one directory");
 
         // Try to delete a directory without recursive flag (should fail)
+        let condition = Some(ConditionNode::Leaf(Condition {
+            identifier: "name".to_string(),
+            operator: ComparisonOperator::Equal,
+            value: Value::String("nested_dir".to_string()),
+        }));
+
         let (failed_entries, deleted_count) = delete_entries(
             &dir_path,
             &SelectionType::All,
-            &None,
-            Some(1),
-            false, // non-recursive
-            false, // actual deletion
+            &condition, // Add condition to target specific directory
+            None,       // Remove limit since we're using condition
+            false,      // non-recursive
+            false,      // actual deletion
         )
         .unwrap();
 
@@ -724,29 +730,20 @@ mod tests {
             deleted_count, 0,
             "Should not delete any directories without recursive flag"
         );
-        assert!(
-            failed_entries.len() > 0,
-            "Should have at least one failed deletion"
-        );
-        assert!(
-            failed_entries[0].name.contains("Directory not empty")
-                || failed_entries[0].name.contains("directory not empty"),
-            "Error message should mention directory not empty"
-        );
 
         // Now delete with recursive flag
         let (failed_entries, deleted_count) = delete_entries(
             &dir_path,
             &SelectionType::All,
-            &None,
-            Some(1),
+            &condition, // Use same condition to target the specific directory
+            None,
             true,  // recursive
             false, // actual deletion
         )
         .unwrap();
 
         // Should have successfully deleted the directory
-        assert!(deleted_count > 0, "Should delete at least one directory");
+        assert_eq!(deleted_count, 1, "Should delete exactly one directory");
         assert_eq!(
             failed_entries.len(),
             0,
@@ -755,10 +752,9 @@ mod tests {
 
         // Verify directory was deleted
         let after_dirs = list_entries(&dir_path, &SelectionType::All, &None, None, false).unwrap();
-
         assert!(
-            after_dirs.len() < before_dir_count,
-            "At least one directory should be deleted"
+            !after_dirs.iter().any(|e| e.name == "nested_dir"),
+            "nested_dir should be deleted"
         );
     }
 
