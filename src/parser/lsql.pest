@@ -3,6 +3,7 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT    = _{ "--" ~ (!"\n" ~ ANY)* ~ "\n"? }
 SEMICOLON  = _{ ";" }
+ASTERISK   = _{ "*" }
 // Keywords
 SELECT    = _{ "select" }
 FROM      = _{ "from" }
@@ -34,7 +35,7 @@ limit_clause   = { LIMIT ~ number }
 
 // Selection for SELECT queries
 selection = {
-    "*"
+    ASTERISK
   | field_list // specific fields
 }
 
@@ -84,15 +85,24 @@ comparison        = { identifier ~ comparison_operator ~ value }
 identifier        = { "name" | "path" | "size" | "modified" | "created" | "ext" | "permissions" | "owner" | "is_hidden" | "is_readonly" | "type" }
 
 // Comparison operators
+LESS_OR_EQUAL    = { "<=" }
+GREATER_OR_EQUAL = { ">=" }
+EQUAL            = { "=" }
+NOT_EQUAL        = { "!=" }
+LESS             = { "<" }
+GREATER          = { ">" }
+LIKE             = { "like" }
+CONTAINS         = { "contains" }
+
 comparison_operator =  {
-    "<="
-  | ">="
-  | "="
-  | "!="
-  | "<"
-  | ">"
-  | "like"
-  | "contains"
+    LESS_OR_EQUAL
+  | GREATER_OR_EQUAL
+  | EQUAL
+  | NOT_EQUAL
+  | LESS
+  | GREATER
+  | LIKE
+  | CONTAINS
 }
 value               = @{ string | number | bool }
 string              = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" }

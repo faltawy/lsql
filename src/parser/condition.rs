@@ -71,17 +71,18 @@ fn parse_primary_condition(mut pairs: Pairs<Rule>) -> ConditionNode {
                     (inner_pairs.next(), inner_pairs.next(), inner_pairs.next())
                 {
                     let identifier = id_pair.as_str().to_string();
-                    let op_str = op_pair.as_str();
-
-                    let operator = match op_str {
-                        "=" => ComparisonOperator::Equal,
-                        "!=" => ComparisonOperator::NotEqual,
-                        "<" => ComparisonOperator::LessThan,
-                        "<=" => ComparisonOperator::LessOrEqual,
-                        ">" => ComparisonOperator::GreaterThan,
-                        ">=" => ComparisonOperator::GreaterOrEqual,
-                        "like" => ComparisonOperator::Like,
-                        "contains" => ComparisonOperator::Contains,
+                    let op_rule = op_pair.as_rule();
+                    let op_str = op_pair.as_str().to_string();
+                    debug!("Operator rule: {:?}, str: {}", op_rule, op_str);
+                    let operator = match op_pair.into_inner().next().unwrap().as_rule() {
+                        Rule::EQUAL => ComparisonOperator::Equal,
+                        Rule::NOT_EQUAL => ComparisonOperator::NotEqual,
+                        Rule::LESS => ComparisonOperator::LessThan,
+                        Rule::LESS_OR_EQUAL => ComparisonOperator::LessOrEqual,
+                        Rule::GREATER => ComparisonOperator::GreaterThan,
+                        Rule::GREATER_OR_EQUAL => ComparisonOperator::GreaterOrEqual,
+                        Rule::LIKE => ComparisonOperator::Like,
+                        Rule::CONTAINS => ComparisonOperator::Contains,
                         _ => {
                             warn!(
                                 "Unknown comparison operator: {}, defaulting to EQUAL",

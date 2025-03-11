@@ -11,10 +11,7 @@ pub fn parse_selection(mut pairs: Pairs<Rule>) -> SelectionType {
 
         match selection_pair.as_rule() {
             Rule::selection => {
-                let selection_str = selection_pair.as_str();
-
-                // Check the selection string directly
-                if selection_str == "*" {
+                if selection_pair.as_rule() == Rule::ASTERISK {
                     debug!("Matched '*' selection");
                     return SelectionType::All;
                 } else {
