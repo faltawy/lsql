@@ -1,7 +1,11 @@
 use crate::cli::CLI;
 use log::{error, info, warn};
 use nu_ansi_term::{Color, Style};
-use reedline::{DefaultPrompt, Prompt, PromptEditMode, PromptHistorySearch, Reedline, Signal};
+use reedline::{
+    default_emacs_keybindings, DefaultPrompt, DefaultValidator, Emacs, Prompt, PromptEditMode,
+    PromptHistorySearch, Reedline, Signal,
+};
+
 use std::borrow::Cow;
 use std::io::{self, Write};
 
@@ -77,27 +81,17 @@ impl From<String> for ShellError {
 impl LSQLShell {
     pub fn new() -> Self {
         // Configure a simple line editor without highlighting or completion
-        let line_editor = Reedline::create();
-
+        let mut _keybindings = default_emacs_keybindings();
+        let edit_mode = Box::new(Emacs::new(_keybindings));
+        let line_editor = Reedline::create()
+            .with_edit_mode(edit_mode)
+            .with_validator(Box::new(DefaultValidator));
         Self {
             reedline: line_editor,
         }
     }
 
     pub fn print_welcome_message(&self) {
-        println!(
-            "{}",
-            nu_ansi_term::Color::Cyan.paint(
-                r#"
-    ██╗      ███████╗ ██████╗ ██╗     
-    ██║      ██╔════╝██╔═══██╗██║     
-    ██║      ███████╗██║   ██║██║     
-    ██║      ╚════██║██║▄▄ ██║██║     
-    ███████╗ ███████║╚██████╔╝███████╗
-    ╚══════╝ ╚══════╝ ╚══▀▀═╝ ╚══════╝
-        "#
-            )
-        );
         println!(
             "{}",
             nu_ansi_term::Color::White

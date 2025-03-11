@@ -40,7 +40,7 @@ syntect = "5.1.0"
 miette = { version = "7.5.0", features = ["fancy"] }
 regex = "1.10.3"
 tempfile = "3.10.1"
-
+crossterm = "0.28.1"
 [[bin]]
 name = "lsql"
 path = "src/main.rs"
