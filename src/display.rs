@@ -91,8 +91,8 @@ fn get_header_row(selection: &SelectionType, theme: &Theme, use_color: bool) -> 
 
     // Add columns based on selection
     match selection {
-        SelectionType::All | SelectionType::Files | SelectionType::Directories => {
-            // Default columns for All, Files, or Directories selection
+        SelectionType::All => {
+            // Default columns for All selection
             row.add_cell(create_header_cell("Name"));
             row.add_cell(create_header_cell("Type"));
             row.add_cell(create_header_cell("Size"));
@@ -145,7 +145,7 @@ fn get_entry_row(
 
     // Add columns based on selection
     match selection {
-        SelectionType::All | SelectionType::Files | SelectionType::Directories => {
+        SelectionType::All => {
             // Add name as the first column
             row.add_cell(name_cell);
 

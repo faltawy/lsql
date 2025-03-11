@@ -15,10 +15,6 @@ pub enum QueryType {
 pub enum SelectionType {
     /// Select all entries (both files and directories)
     All,
-    /// Select only files
-    Files,
-    /// Select only directories
-    Directories,
     /// Select specific fields from entries
     Fields(Vec<String>),
 }
@@ -125,13 +121,9 @@ mod tests {
     fn test_selection_type_variants() {
         // Test that each variant can be created
         let all = SelectionType::All;
-        let files = SelectionType::Files;
-        let dirs = SelectionType::Directories;
         let fields = SelectionType::Fields(vec!["name".to_string(), "size".to_string()]);
 
         assert!(matches!(all, SelectionType::All));
-        assert!(matches!(files, SelectionType::Files));
-        assert!(matches!(dirs, SelectionType::Directories));
         if let SelectionType::Fields(f) = fields {
             assert_eq!(f.len(), 2);
             assert!(f.contains(&"name".to_string()));

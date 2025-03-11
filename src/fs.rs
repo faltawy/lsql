@@ -172,8 +172,6 @@ pub fn list_entries(
                         // Filter based on selection type
                         let include = match selection {
                             SelectionType::All => true,
-                            SelectionType::Files => fs_entry.is_file,
-                            SelectionType::Directories => fs_entry.is_dir,
                             SelectionType::Fields(_) => true, // Fields selection doesn't affect filtering
                         };
 
@@ -550,16 +548,12 @@ mod tests {
 
         // Test with files selection and limit
         let file_entries =
-            list_entries(&dir_path, &SelectionType::Files, &None, Some(4), false).unwrap();
+            list_entries(&dir_path, &SelectionType::All, &None, Some(4), false).unwrap();
 
         assert_eq!(
             file_entries.len(),
             4,
             "Should return exactly 4 file entries"
-        );
-        assert!(
-            file_entries.iter().all(|e| e.is_file),
-            "All entries should be files"
         );
 
         // Create a simple condition for testing
@@ -592,7 +586,7 @@ mod tests {
         // Test with dry run mode (should not delete anything)
         let (entries_to_delete, deleted_count) = delete_entries(
             &dir_path,
-            &SelectionType::Files,
+            &SelectionType::All,
             &None,
             Some(3),
             false,
@@ -636,14 +630,14 @@ mod tests {
 
         // Count files before deletion
         let before_entries =
-            list_entries(&dir_path, &SelectionType::Files, &None, None, false).unwrap();
+            list_entries(&dir_path, &SelectionType::All, &None, None, false).unwrap();
 
         let before_count = before_entries.len();
 
         // Delete entries matching the condition
         let (failed_entries, deleted_count) = delete_entries(
             &dir_path,
-            &SelectionType::Files,
+            &SelectionType::All,
             &condition,
             None,
             false,
@@ -661,7 +655,7 @@ mod tests {
 
         // Verify file was deleted
         let after_entries =
-            list_entries(&dir_path, &SelectionType::Files, &None, None, false).unwrap();
+            list_entries(&dir_path, &SelectionType::All, &None, None, false).unwrap();
 
         assert_eq!(
             after_entries.len(),
@@ -691,8 +685,7 @@ mod tests {
         }
 
         // Count directories before deletion
-        let before_dirs =
-            list_entries(&dir_path, &SelectionType::Directories, &None, None, false).unwrap();
+        let before_dirs = list_entries(&dir_path, &SelectionType::All, &None, None, false).unwrap();
 
         let before_dir_count = before_dirs.len();
         assert!(before_dir_count > 0, "Should have at least one directory");
@@ -700,7 +693,7 @@ mod tests {
         // Try to delete a directory without recursive flag (should fail)
         let (failed_entries, deleted_count) = delete_entries(
             &dir_path,
-            &SelectionType::Directories,
+            &SelectionType::All,
             &None,
             Some(1),
             false, // non-recursive
@@ -726,7 +719,7 @@ mod tests {
         // Now delete with recursive flag
         let (failed_entries, deleted_count) = delete_entries(
             &dir_path,
-            &SelectionType::Directories,
+            &SelectionType::All,
             &None,
             Some(1),
             true,  // recursive
@@ -743,8 +736,7 @@ mod tests {
         );
 
         // Verify directory was deleted
-        let after_dirs =
-            list_entries(&dir_path, &SelectionType::Directories, &None, None, false).unwrap();
+        let after_dirs = list_entries(&dir_path, &SelectionType::All, &None, None, false).unwrap();
 
         assert!(
             after_dirs.len() < before_dir_count,
@@ -797,7 +789,7 @@ mod tests {
         // Delete the top-level directory recursively
         let (failed_entries, deleted_count) = delete_entries(
             &dir_path,
-            &SelectionType::Directories,
+            &SelectionType::All,
             &Some(ConditionNode::Leaf(Condition {
                 identifier: "name".to_string(),
                 operator: ComparisonOperator::Equal,
@@ -845,8 +837,7 @@ mod tests {
         let dir_path = temp_dir.path().to_string_lossy().to_string();
 
         // Get all entries
-        let mut entries =
-            list_entries(&dir_path, &SelectionType::Files, &None, None, false).unwrap();
+        let mut entries = list_entries(&dir_path, &SelectionType::All, &None, None, false).unwrap();
 
         // Ensure we have at least 3 entries for testing
         assert!(
@@ -890,7 +881,7 @@ mod tests {
         // First, make sure we have files with different sizes
         let mut entries = list_entries(
             &dir_path,
-            &SelectionType::Files,
+            &SelectionType::All,
             &None,
             None,
             true, // recursive to get more files

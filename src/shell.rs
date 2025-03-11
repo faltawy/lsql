@@ -12,7 +12,6 @@ struct LSQLPrompt {
 
 impl LSQLPrompt {
     fn new() -> Self {
-        // Create a simpler prompt using DefaultPrompt's constructor
         Self {
             base_prompt: DefaultPrompt::default(),
         }
@@ -139,17 +138,10 @@ impl LSQLShell {
                 print!("\x1B[2J\x1B[1;1H"); // ANSI escape code to clear screen
                 io::stdout().flush()?;
             }
-            _ => {
-                // Handle SQL query
-                if command.starts_with("select") {
-                    match cli.execute_query(&command) {
-                        Ok(_) => (),
-                        Err(e) => return Err(ShellError::ExecutionError(e)),
-                    }
-                } else {
-                    return Err(ShellError::UnknownCommand(command));
-                }
-            }
+            _ => match cli.execute_query(&command) {
+                Ok(_) => (),
+                Err(e) => return Err(ShellError::ExecutionError(e)),
+            },
         }
 
         Ok(true)

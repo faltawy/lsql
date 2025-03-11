@@ -30,12 +30,6 @@ pub fn parse_selection(mut pairs: Pairs<Rule>) -> SelectionType {
                             if fields.len() == 1 {
                                 // Handle special cases for backward compatibility
                                 match fields[0].as_str() {
-                                    // These are no longer in the grammar but we handle them for test compatibility
-                                    "files" | "f" => return SelectionType::Files,
-                                    "directories" | "dirs" | "d" => {
-                                        return SelectionType::Directories
-                                    }
-                                    // New type field with value filter
                                     "type" => {
                                         // Just return the field list, the actual filtering will be done elsewhere
                                         return SelectionType::Fields(fields);
