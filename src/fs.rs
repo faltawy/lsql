@@ -366,9 +366,27 @@ pub fn delete_entries(
                 debug!("Recursively deleting directory: {}", entry.path);
                 std::fs::remove_dir_all(path)
             } else {
-                // If not recursive, only delete if directory is empty
-                debug!("Deleting directory (if empty): {}", entry.path);
-                std::fs::remove_dir(path)
+                // If not recursive, check if directory is empty first
+                match std::fs::read_dir(path) {
+                    Ok(mut dir_iter) => {
+                        if dir_iter.next().is_none() {
+                            // Directory is empty, safe to delete
+                            debug!("Deleting empty directory: {}", entry.path);
+                            std::fs::remove_dir(path)
+                        } else {
+                            // Directory not empty and recursive flag not set
+                            debug!(
+                                "Skipping non-empty directory (recursive flag not set): {}",
+                                entry.path
+                            );
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                "Directory not empty (use recursive flag to delete)",
+                            ))
+                        }
+                    }
+                    Err(e) => Err(e),
+                }
             }
         } else {
             debug!("Deleting file: {}", entry.path);
