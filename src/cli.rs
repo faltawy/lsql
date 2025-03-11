@@ -83,6 +83,9 @@ pub enum Command {
         #[clap(long, short = 'n')]
         name: Option<String>,
     },
+    
+    /// Display version information
+    Version,
 }
 
 // Theme subcommands
@@ -224,6 +227,11 @@ impl CLI {
                             }
                         }
                     }
+                    return Ok(());
+                }
+
+                Command::Version => {
+                    println!("lsql {}", env!("CARGO_PKG_VERSION"));
                     return Ok(());
                 }
             }
