@@ -726,6 +726,7 @@ mod tests {
         .unwrap();
 
         // Should have failed to delete the directory because it's not empty
+        assert_eq!(failed_entries.len(), 1, "Should fail to delete nested dir");
         assert_eq!(
             deleted_count, 0,
             "Should not delete any directories without recursive flag"

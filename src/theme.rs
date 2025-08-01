@@ -472,3 +472,50 @@ pub fn get_border_style(style_name: &str) -> &str {
         _ => "thin", // Default to thin borders
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use tempfile::tempdir;
+
+    #[test]
+    #[serial]
+    fn test_set_theme_invalid_name() {
+        let temp = tempdir().unwrap();
+        std::env::set_var("XDG_CONFIG_HOME", temp.path());
+
+        let mut manager = ThemeManager::new();
+        manager.initialize();
+
+        let result = manager.set_theme("does_not_exist");
+        assert!(result.is_err());
+
+        std::env::remove_var("XDG_CONFIG_HOME");
+    }
+
+    #[test]
+    #[serial]
+    fn test_create_and_set_theme() {
+        let temp = tempdir().unwrap();
+        std::env::set_var("XDG_CONFIG_HOME", temp.path());
+
+        let mut manager = ThemeManager::new();
+        manager.initialize();
+
+        let mut theme = Theme::default();
+        theme.name = "mytheme".to_string();
+        theme.description = "Test theme".to_string();
+
+        manager.create_theme(theme.clone()).unwrap();
+        assert!(manager.list_themes().contains(&"mytheme".to_string()));
+
+        manager.set_theme("mytheme").unwrap();
+        assert_eq!(manager.current_theme().name, "mytheme");
+
+        let theme_path = temp.path().join("lsql").join("themes").join("mytheme.toml");
+        assert!(theme_path.exists());
+
+        std::env::remove_var("XDG_CONFIG_HOME");
+    }
+}

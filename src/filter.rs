@@ -122,6 +122,34 @@ impl ConditionMatcher for FSEntry {
                     false
                 }
             },
+            "is_dir" => match value {
+                Value::Bool(b) => match operator {
+                    ComparisonOperator::Equal => self.is_dir == *b,
+                    ComparisonOperator::NotEqual => self.is_dir != *b,
+                    _ => {
+                        warn!("Invalid operator for boolean comparison: {:?}", operator);
+                        false
+                    }
+                },
+                _ => {
+                    warn!("Invalid value type for boolean comparison: {:?}", value);
+                    false
+                }
+            },
+            "is_file" => match value {
+                Value::Bool(b) => match operator {
+                    ComparisonOperator::Equal => self.is_file == *b,
+                    ComparisonOperator::NotEqual => self.is_file != *b,
+                    _ => {
+                        warn!("Invalid operator for boolean comparison: {:?}", operator);
+                        false
+                    }
+                },
+                _ => {
+                    warn!("Invalid value type for boolean comparison: {:?}", value);
+                    false
+                }
+            },
             "is_readonly" => match value {
                 Value::Bool(b) => match operator {
                     ComparisonOperator::Equal => (self.permissions.contains("readonly")) == *b,
@@ -522,6 +550,36 @@ mod tests {
         hidden_entry.is_hidden = true;
 
         assert!(!hidden_entry.evaluate_condition_node(&condition));
+    }
+
+    #[test]
+    fn test_is_file_condition() {
+        let file_entry = create_test_entry();
+        let dir_entry = create_test_directory();
+
+        let cond = ConditionNode::Leaf(Condition {
+            identifier: "is_file".to_string(),
+            operator: ComparisonOperator::Equal,
+            value: Value::Bool(true),
+        });
+
+        assert!(file_entry.evaluate_condition_node(&cond));
+        assert!(!dir_entry.evaluate_condition_node(&cond));
+    }
+
+    #[test]
+    fn test_is_dir_condition() {
+        let file_entry = create_test_entry();
+        let dir_entry = create_test_directory();
+
+        let cond = ConditionNode::Leaf(Condition {
+            identifier: "is_dir".to_string(),
+            operator: ComparisonOperator::Equal,
+            value: Value::Bool(true),
+        });
+
+        assert!(dir_entry.evaluate_condition_node(&cond));
+        assert!(!file_entry.evaluate_condition_node(&cond));
     }
 
     #[test]
