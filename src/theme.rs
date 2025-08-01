@@ -7,7 +7,7 @@ use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // Define a struct to represent a theme
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -299,7 +299,7 @@ impl ThemeManager {
     }
 
     // Save built-in themes as examples in the user config directory
-    fn save_builtin_themes(&self, config_dir: &PathBuf) {
+    fn save_builtin_themes(&self, config_dir: &Path) {
         for theme in self.available_themes.values() {
             let theme_path = config_dir.join(format!("{}.toml", theme.name));
 

@@ -26,12 +26,9 @@ pub fn parse_selection(mut pairs: Pairs<Rule>) -> SelectionType {
                             // For backward compatibility with tests
                             if fields.len() == 1 {
                                 // Handle special cases for backward compatibility
-                                match fields[0].as_str() {
-                                    "type" => {
-                                        // Just return the field list, the actual filtering will be done elsewhere
-                                        return SelectionType::Fields(fields);
-                                    }
-                                    _ => {}
+                                if fields[0].as_str() == "type" {
+                                    // Just return the field list, the actual filtering will be done elsewhere
+                                    return SelectionType::Fields(fields);
                                 }
                             } else if fields.len() == 3 && fields.contains(&"type".to_string()) {
                                 // Handle "type = file" or "type = dir" conditions

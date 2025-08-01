@@ -122,7 +122,7 @@ fn get_datetime_from_metadata(
     };
 
     let secs = duration.as_secs() as i64;
-    let nsecs = duration.subsec_nanos() as u32;
+    let nsecs = duration.subsec_nanos();
 
     // Convert to DateTime<Local>
     match DateTime::from_timestamp(secs, nsecs) {
@@ -208,8 +208,8 @@ fn normalize_path(path_str: &str) -> Result<PathBuf, String> {
 
     // Handle special case for current directory
     if path_str == "." {
-        return Ok(std::env::current_dir()
-            .map_err(|e| format!("Failed to get current directory: {}", e))?);
+        return std::env::current_dir()
+            .map_err(|e| format!("Failed to get current directory: {}", e));
     }
 
     // Handle home directory expansion
@@ -259,14 +259,14 @@ pub fn execute_query(
 
     // Apply sorting if ORDER BY is specified
     if !query.order_by.is_empty() {
-        sort_entries(&mut entries, &query.order_by);
+        sort_entries(&mut entries[..], &query.order_by);
     }
 
     Ok(entries)
 }
 
 // Sort entries based on ORDER BY terms
-fn sort_entries(entries: &mut Vec<FSEntry>, order_by: &[crate::parser::OrderTerm]) {
+fn sort_entries(entries: &mut [FSEntry], order_by: &[crate::parser::OrderTerm]) {
     use crate::parser::OrderDirection;
     use std::cmp::Ordering;
 
@@ -379,8 +379,7 @@ pub fn delete_entries(
                                 "Skipping non-empty directory (recursive flag not set): {}",
                                 entry.path
                             );
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            Err(std::io::Error::other(
                                 "Directory not empty (use recursive flag to delete)",
                             ))
                         }

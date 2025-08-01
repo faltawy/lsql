@@ -1,4 +1,4 @@
-use crate::cli::CLI;
+use crate::cli::Cli;
 use log::{error, info};
 use nu_ansi_term::{Color, Style};
 use reedline::{
@@ -111,7 +111,7 @@ impl LSQLShell {
         println!();
     }
 
-    fn process_command(&self, line: &str, cli: &CLI) -> Result<bool, ShellError> {
+    fn process_command(&self, line: &str, cli: &Cli) -> Result<bool, ShellError> {
         let command = line.trim().to_lowercase();
 
         // Empty command - just ignore
@@ -247,7 +247,7 @@ impl LSQLShell {
         );
     }
 
-    pub fn run(&mut self, cli: &CLI) {
+    pub fn run(&mut self, cli: &Cli) {
         info!("Starting LSQL interactive shell");
         self.print_welcome_message();
 

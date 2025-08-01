@@ -10,15 +10,15 @@ mod shell;
 mod theme;
 
 use clap::Parser;
-use cli::{Args, CLI};
+use cli::{Args, Cli};
 use log::{error, info};
 
 fn main() {
     // Parse command-line arguments
     let args = Args::parse();
 
-    // Create CLI instance (this will setup the logger)
-    let cli = CLI::new(args.clone());
+    // Create Cli instance (this will setup the logger)
+    let cli = Cli::new(args.clone());
 
     info!("LSQL started");
 
