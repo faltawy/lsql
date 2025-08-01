@@ -52,28 +52,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-test:
-    name: Build and Test (${{ matrix.target.rust }}, ${{ matrix.os }})
+    name: Build and Test (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-2019, macos-latest]
-        target:
-          - { rust: x86_64-unknown-linux-gnu, os: ubuntu-latest }
-          - { rust: x86_64-pc-windows-msvc, os: windows-2019 }
-          - { rust: x86_64-apple-darwin, os: macos-latest }
-        exclude:
+        include:
           - os: ubuntu-latest
-            target: { rust: x86_64-pc-windows-msvc }
-          - os: ubuntu-latest
-            target: { rust: x86_64-apple-darwin }
+            target: x86_64-unknown-linux-gnu
           - os: windows-2019
-            target: { rust: x86_64-unknown-linux-gnu }
-          - os: windows-2019
-            target: { rust: x86_64-apple-darwin }
+            target: x86_64-pc-windows-msvc
           - os: macos-latest
-            target: { rust: x86_64-unknown-linux-gnu }
-          - os: macos-latest
-            target: { rust: x86_64-pc-windows-msvc }
+            target: x86_64-apple-darwin
 
     steps:
     - name: Checkout code
@@ -83,12 +72,12 @@ jobs:
       uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{ env.RUST_VERSION }}
-        targets: ${{ matrix.target.rust }}
+        targets: ${{ matrix.target }}
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        key: ${{ matrix.target.rust }}-${{ matrix.os }}
+        key: ${{ matrix.target }}-${{ matrix.os }}
 
     - name: Install cross (Linux only)
       if: matrix.os == 'ubuntu-latest'
@@ -99,33 +88,33 @@ jobs:
       uses: microsoft/setup-msbuild@v1.3
 
     - name: Build
-      run: cargo build --target ${{ matrix.target.rust }} --release
+      run: cargo build --target ${{ matrix.target }} --release
 
     - name: Run tests
-      run: cargo test --target ${{ matrix.target.rust }} --release
+      run: cargo test --target ${{ matrix.target }} --release
 
     - name: List artifacts (Debug)
       run: |
-        ls -la target/${{ matrix.target.rust }}/release/
+        ls -la target/${{ matrix.target }}/release/
       if: matrix.os == 'ubuntu-latest'
 
     - name: List artifacts (Debug - Windows)
       run: |
-        dir target\${{ matrix.target.rust }}\release\
+        dir target\${{ matrix.target }}\release\
       if: matrix.os == 'windows-2019'
 
     - name: List artifacts (Debug - macOS)
       run: |
-        ls -la target/${{ matrix.target.rust }}/release/
+        ls -la target/${{ matrix.target }}/release/
       if: matrix.os == 'macos-latest'
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.target.rust }}-binaries
+        name: ${{ matrix.target }}-binaries
         path: |
-          target/${{ matrix.target.rust }}/release/lsql
-          target/${{ matrix.target.rust }}/release/lsql.exe
+          target/${{ matrix.target }}/release/lsql
+          target/${{ matrix.target }}/release/lsql.exe
         if-no-files-found: warn
 
   release:
