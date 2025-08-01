@@ -164,6 +164,7 @@ impl ConditionMatcher for FSEntry {
                     false
                 }
             },
+            "permissions" => self.compare_string_field(&self.permissions, operator, value),
             "type" => match value {
                 Value::String(s) => {
                     let type_str = if self.is_dir { "dir" } else { "file" };
@@ -868,49 +869,29 @@ mod tests {
     #[test]
     fn test_permissions_and_type_condition() {
         // Test for permissions and type condition
-        // This test is temporarily skipped until we fix the permissions comparison
         // The condition is: type = 'file' AND permissions = 'readonly'
 
-        // Create test entries with different permissions
-        let _regular_file = create_test_entry(); // Regular file with readwrite permissions
-        let _readonly_file = create_readonly_file(); // Readonly file
-        let _dir_entry = create_test_directory(); // Directory
+        let regular_file = create_test_entry();
+        let readonly_file = create_readonly_file();
+        let dir_entry = create_test_directory();
 
-        // Skip the test for now to allow other tests to pass
-        // We'll fix this in a future update
-        return;
+        let condition = ConditionNode::Branch {
+            left: Box::new(ConditionNode::Leaf(Condition {
+                identifier: "type".to_string(),
+                operator: ComparisonOperator::Equal,
+                value: Value::String("file".to_string()),
+            })),
+            operator: LogicalOperator::And,
+            right: Box::new(ConditionNode::Leaf(Condition {
+                identifier: "permissions".to_string(),
+                operator: ComparisonOperator::Equal,
+                value: Value::String("readonly".to_string()),
+            })),
+        };
 
-        // The code below is unreachable but kept for reference
-        // println!("Regular file permissions: '{}'", regular_file.permissions);
-        // println!("Readonly file permissions: '{}'", readonly_file.permissions);
-
-        // // Test direct string comparison
-        // assert_eq!(readonly_file.permissions, "readonly");
-
-        // // Create a condition for permissions
-        // let permissions_condition = Condition {
-        //     field: "permissions".to_string(),
-        //     operator: ComparisonOperator::Equal,
-        //     value: Value::String("readonly".to_string()),
-        // };
-
-        // // Create a condition for type
-        // let type_condition = Condition {
-        //     field: "type".to_string(),
-        //     operator: ComparisonOperator::Equal,
-        //     value: Value::String("file".to_string()),
-        // };
-
-        // // Create a combined condition: type = 'file' AND permissions = 'readonly'
-        // let condition_node = ConditionNode::And(
-        //     Box::new(ConditionNode::Condition(type_condition)),
-        //     Box::new(ConditionNode::Condition(permissions_condition)),
-        // );
-
-        // // Test the condition on different entries
-        // assert!(!evaluate_condition_node(&condition_node, &regular_file)); // Regular file should not match
-        // assert!(evaluate_condition_node(&condition_node, &readonly_file)); // Readonly file should match
-        // assert!(!evaluate_condition_node(&condition_node, &dir_entry)); // Directory should not match
+        assert!(!regular_file.evaluate_condition_node(&condition));
+        assert!(readonly_file.evaluate_condition_node(&condition));
+        assert!(!dir_entry.evaluate_condition_node(&condition));
     }
 
     #[test]
