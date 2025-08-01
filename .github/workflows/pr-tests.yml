@@ -10,15 +10,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-2019]
+        os: [ubuntu-latest, windows-2019, macos-latest]
         target:
           - { rust: x86_64-unknown-linux-gnu, os: ubuntu-latest }
           - { rust: x86_64-pc-windows-msvc, os: windows-2019 }
+          - { rust: x86_64-apple-darwin, os: macos-latest }
         exclude:
           - os: ubuntu-latest
             target: { rust: x86_64-pc-windows-msvc }
+          - os: ubuntu-latest
+            target: { rust: x86_64-apple-darwin }
           - os: windows-2019
             target: { rust: x86_64-unknown-linux-gnu }
+          - os: windows-2019
+            target: { rust: x86_64-apple-darwin }
+          - os: macos-latest
+            target: { rust: x86_64-unknown-linux-gnu }
+          - os: macos-latest
+            target: { rust: x86_64-pc-windows-msvc }
 
     steps:
     - name: Checkout code
