@@ -307,10 +307,10 @@ fn parse_delete_selection(pairs: Pairs<Rule>) -> (SelectionType, Option<u64>) {
 }
 
 /// Parse the order by clause
-fn parse_order_by(mut pairs: Pairs<Rule>) -> Vec<OrderTerm> {
+fn parse_order_by(pairs: Pairs<Rule>) -> Vec<OrderTerm> {
     let mut order_by = Vec::new();
 
-    while let Some(order_term_pair) = pairs.next() {
+    for order_term_pair in pairs {
         trace!("Processing order_term: {:?}", order_term_pair.as_rule());
 
         match order_term_pair.as_rule() {
@@ -331,11 +331,11 @@ fn parse_order_by(mut pairs: Pairs<Rule>) -> Vec<OrderTerm> {
 }
 
 /// Parse an order term
-fn parse_order_term(mut pairs: Pairs<Rule>) -> OrderTerm {
+fn parse_order_term(pairs: Pairs<Rule>) -> OrderTerm {
     let mut field = String::new();
     let mut direction = OrderDirection::Ascending;
 
-    while let Some(part) = pairs.next() {
+    for part in pairs {
         trace!("Processing order_term_part: {:?}", part.as_rule());
 
         match part.as_rule() {

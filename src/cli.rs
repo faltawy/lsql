@@ -83,7 +83,7 @@ pub enum Command {
         #[clap(long, short = 'n')]
         name: Option<String>,
     },
-    
+
     /// Display version information
     Version,
 }
@@ -119,7 +119,7 @@ pub enum ThemeCommand {
 
 // CLI configuration
 #[derive(Debug, Clone)]
-pub struct CLI {
+pub struct Cli {
     /// Whether to recursively search directories
     pub recursive: bool,
     /// Whether to use color in output
@@ -130,7 +130,7 @@ pub struct CLI {
     pub dry_run: bool,
 }
 
-impl CLI {
+impl Cli {
     // Create a new CLI instance from args
     pub fn new(args: Args) -> Self {
         // Setup logger with appropriate level
@@ -151,7 +151,7 @@ impl CLI {
             }
         }
 
-        CLI {
+        Cli {
             use_color,
             recursive: args.recursive,
             theme_manager,

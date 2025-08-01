@@ -1,5 +1,5 @@
-use crate::cli::CLI;
-use log::{error, info, warn};
+use crate::cli::Cli;
+use log::{error, info};
 use nu_ansi_term::{Color, Style};
 use reedline::{
     default_emacs_keybindings, DefaultPrompt, DefaultValidator, Emacs, Prompt, PromptEditMode,
@@ -62,7 +62,6 @@ pub struct LSQLShell {
 
 enum ShellError {
     ExecutionError(String),
-    UnknownCommand(String),
     IoError(io::Error),
 }
 
@@ -112,7 +111,7 @@ impl LSQLShell {
         println!();
     }
 
-    fn process_command(&self, line: &str, cli: &CLI) -> Result<bool, ShellError> {
+    fn process_command(&self, line: &str, cli: &Cli) -> Result<bool, ShellError> {
         let command = line.trim().to_lowercase();
 
         // Empty command - just ignore
@@ -146,19 +145,6 @@ impl LSQLShell {
             ShellError::ExecutionError(msg) => {
                 eprintln!("{} {}", Color::Red.bold().paint("Error:"), msg);
                 error!("Query execution error: {}", msg);
-            }
-            ShellError::UnknownCommand(cmd) => {
-                eprintln!(
-                    "{} Unknown command '{}'",
-                    Color::Red.bold().paint("Error:"),
-                    cmd
-                );
-                eprintln!(
-                    "    {} Type {} to see available commands",
-                    Color::Cyan.bold().paint("•"),
-                    Color::Cyan.paint("help")
-                );
-                warn!("Unknown command attempted: {}", cmd);
             }
             ShellError::IoError(err) => {
                 eprintln!("{} I/O error: {}", Color::Red.bold().paint("Error:"), err);
@@ -261,7 +247,7 @@ impl LSQLShell {
         );
     }
 
-    pub fn run(&mut self, cli: &CLI) {
+    pub fn run(&mut self, cli: &Cli) {
         info!("Starting LSQL interactive shell");
         self.print_welcome_message();
 
