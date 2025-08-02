@@ -35,8 +35,7 @@ toml = "0.8.8"
 dirs = "6.0.0"
 reedline = "0.38.0"
 nu-ansi-term = "0.50.1"
-nu-plugin = "0.102.0"
-syntect = "5.1.0"
+syntect = { version = "5.2.0", default-features = false, features = ["default-fancy"] }
 miette = { version = "7.5.0", features = ["fancy"] }
 regex = "1.10.3"
 tempfile = "3.10.1"
