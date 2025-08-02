@@ -14,8 +14,16 @@ src/
 ├── fs.rs         # File system operations
 ├── display.rs    # Output formatting
 ├── cli.rs        # Command-line interface
+├── interpreter.rs # High-level interpreter coordinating all layers
 └── main.rs       # Entry point
 ```
+
+At a high level, the codebase is split into four layers:
+
+1. **Interpreter** – Coordinates the CLI or interactive shell and orchestrates the rest of the pipeline (`src/interpreter.rs`).
+2. **Parser** – Turns the user's query string into a structured `Query` (see `src/parser`).
+3. **Filtering** – Traverses the filesystem and applies query conditions (`src/fs.rs` and `src/filter.rs`).
+4. **View** – Formats the filtered results for display (`src/display.rs`).
 
 ## Module Responsibilities
 
