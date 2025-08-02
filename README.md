@@ -11,6 +11,15 @@ LSQL is a command-line utility that queries files and directories using SQL-like
 - Configurable logging levels for debugging
 - Cross-platform (Windows, macOS, Linux)
 
+## Architecture Overview
+
+The application is organized into four layers:
+
+1. **Interpreter** – Handles the command-line interface and interactive shell (`src/interpreter.rs`).
+2. **Parser** – Converts the query string into a structured `Query` type.
+3. **Filtering** – Traverses the filesystem and filters entries based on the parsed query.
+4. **View** – Formats the filtered results for display.
+
 ## Installation
 
 ### Using Cargo
